@@ -34,7 +34,7 @@ fun main (args: Array<String>) {
         val refId = it.articleIdList.articleId[0].getvalue()
         println("Ref Id = $refId   Citation: $citation")
     }
-    val pubmedEntry = PubMedEntry.parsePubMedArticle(pubmedArticle)
+    val pubmedEntry = PubMedEntry.parsePubMedArticle(pubmedArticle,"Origin")
     // display values
     println("PubMed Id: ${pubmedEntry.pubmedId}")
     println("PMC Id: ${pubmedEntry.pmcId}")

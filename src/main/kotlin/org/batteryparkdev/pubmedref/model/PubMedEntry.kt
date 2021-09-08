@@ -1,9 +1,10 @@
 package org.batteryparkdev.pubmedref.model
 
 import ai.wisecube.pubmed.*
+import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
 
 data class PubMedEntry(
-    val labels: List<String>,
+    val label: String,
     val pubmedId: String,
     val parentPubMedId: String,
     val pmcId: String = "",
@@ -14,13 +15,16 @@ data class PubMedEntry(
     val abstract: String,
     val authorCaption: String,
     val referenceSet: Set<String>,
-    var citedByCount: Int
+    val citationSet: Set<String>,
+    val citedByCount: Int
 ) {
     companion object {
         /*
         Function to parse attributes from the PubMedArticle JaXB model object
+        label should be one of (Origin, Reference, Citation)
          */
-        fun parsePubMedArticle(pubmedArticle: PubmedArticle, parentId: String = ""): PubMedEntry {
+        fun parsePubMedArticle(pubmedArticle: PubmedArticle, label:String = "Origin",
+                               parentId:String = ""): PubMedEntry {
             val pmid = pubmedArticle.medlineCitation.pmid.getvalue()
             val pmcid = resolveArticleIdByType(pubmedArticle, "pmc")
             val doiid = resolveArticleIdByType(pubmedArticle, "doi")
@@ -29,16 +33,17 @@ data class PubMedEntry(
             val journalIssue = resolveJournalIssue(pubmedArticle)
             val title = pubmedArticle.medlineCitation.article.articleTitle.getvalue()
             val abstract = resolveAbstract(pubmedArticle)
+            val citations = PubMedRetrievalService.retrieveCitationIds(pmid)
 
             return PubMedEntry(
-                mutableListOf(), pmid, parentId,
+                label, pmid, parentId,
                 pmcid, doiid, journalName, journalIssue, title,
-                abstract, authors, resolveReferenceIdSet(pubmedArticle), 0
-            )
+                abstract, authors, resolveReferenceIdSet(pubmedArticle),
+                citations, citations.size)
         }
 
 
-        fun resolveReferenceIdSet(pubmedArticle: PubmedArticle): Set<String> {
+        private fun resolveReferenceIdSet(pubmedArticle: PubmedArticle): Set<String> {
             val refSet = mutableSetOf<String>()
             pubmedArticle.pubmedData.referenceList.stream().forEach { refL ->
                 refL.reference.stream().forEach { ref ->
@@ -52,7 +57,7 @@ data class PubMedEntry(
             return refSet.toSet()
         }
 
-        fun resolveAbstract(pubmedArticle: PubmedArticle): String {
+        private fun resolveAbstract(pubmedArticle: PubmedArticle): String {
 
             val absTextList = pubmedArticle.medlineCitation.article.abstract.abstractText
             if (absTextList.isNotEmpty()) {
@@ -61,7 +66,7 @@ data class PubMedEntry(
             return ""
         }
 
-        fun resolveArticleIdByType(pubmedArticle: PubmedArticle, type: String): String {
+        private fun resolveArticleIdByType(pubmedArticle: PubmedArticle, type: String): String {
             val articleId = pubmedArticle.pubmedData.articleIdList.articleId.filter { it.idType == type }
                 .firstOrNull()
             return if (articleId != null) articleId.getvalue() else ""
@@ -72,7 +77,7 @@ data class PubMedEntry(
         two (authors) plus et al if > 2 authors
         e.g.  Smith, Robert; Jones, Mary, et al
          */
-        fun generateAuthorCaption(pubmedArticle: PubmedArticle): String {
+        private fun generateAuthorCaption(pubmedArticle: PubmedArticle): String {
             val authorList = pubmedArticle.medlineCitation.article.authorList.author
             val ret = when (authorList.size) {
                 0 -> ""
@@ -87,7 +92,7 @@ data class PubMedEntry(
             return ret
         }
 
-        fun processAuthorName(author: Author): String {
+        private fun processAuthorName(author: Author): String {
             val authorNameList = author.lastNameOrForeNameOrInitialsOrSuffixOrCollectiveName
             var name = ""
             val lastName: LastName = authorNameList[0] as LastName
@@ -104,7 +109,7 @@ data class PubMedEntry(
             return name
         }
 
-        fun resolveJournalIssue(pubmedArticle: PubmedArticle): String {
+        private fun resolveJournalIssue(pubmedArticle: PubmedArticle): String {
             var ret = ""
             val journalIssue = pubmedArticle.medlineCitation.article.journal.journalIssue
             val year = (journalIssue.pubDate.yearOrMonthOrDayOrSeasonOrMedlineDate[0] as Year).getvalue()
