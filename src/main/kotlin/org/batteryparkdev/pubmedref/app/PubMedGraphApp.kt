@@ -1,13 +1,10 @@
 package org.batteryparkdev.pubmedref.app
 
-import ai.wisecube.pubmed.PubmedArticle
 import ai.wisecube.pubmed.PubmedParser
 import com.google.common.flogger.FluentLogger
 import org.batteryparkdev.pubmedref.model.PubMedEntry
 import org.batteryparkdev.pubmedref.neo4j.Neo4jPubMedLoader
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
-import java.net.URL
-import java.nio.charset.Charset
 
 private val logger: FluentLogger = FluentLogger.forEnclosingClass();
 const val defaultId = "26050619"
@@ -41,6 +38,7 @@ fun loadCitationNodes(pubMedEntry: PubMedEntry){
         run {
             val citEntry = resolvePubMedEntryById(id, "Citation", parentId)
             Neo4jPubMedLoader.loadPubMedEntry(citEntry)
+            Thread.sleep(300L)  // Accommodate NCBI request rate limit
         }
     }
 }
@@ -51,6 +49,7 @@ fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
         run {
             val refEntry = resolvePubMedEntryById(id, "Reference", parentId)
             Neo4jPubMedLoader.loadPubMedEntry(refEntry)
+            Thread.sleep(300L) // Accommodate NCBI request rate limit
         }
     }
 }

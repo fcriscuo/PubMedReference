@@ -11,7 +11,7 @@ import org.batteryparkdev.pubmedref.service.getEnvVariable
 import org.neo4j.driver.*
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.LocalDateTime
+import java.util.*
 
 /**
  * Responsible for establishing a connection to a local Neo4j database
@@ -75,10 +75,19 @@ object Neo4jConnectionService {
     }
 }
 
-fun resolveCurrentTime ():String =
-    SimpleDateFormat("yyyy-MM-dd_HH:mm").format(LocalDateTime.now())
+fun resolveCurrentTime (): String {
+    val sdf = SimpleDateFormat("dd-MM-yyyy_hh:mm:ss")
+    return sdf.format(Date())
+}
 
 fun resolveCypherLogFileName() =
-    DatafilesPropertiesService.resolvePropertyAsString("neo4j.log.dir") +
+    DatafilesPropertiesService.resolvePropertyAsString("neo4j.log.dir") +"/" +
             DatafilesPropertiesService.resolvePropertyAsString("neo4j.log.file.prefix") +
             "_" + resolveCurrentTime()+ ".log"
+
+
+ fun main() {
+     val command = "MATCH (n) RETURN COUNT(n)"
+     val count = Neo4jConnectionService.executeCypherCommand(command)
+     println(count)
+ }

@@ -61,6 +61,9 @@ object PubMedRetrievalService {
 }
 
 fun main() {
+    // test PubMedArticle retrieval
+    val article = PubMedRetrievalService.retrievePubMedArticle("26050619")
+    println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
     // test parsing citations from XML-formatted response
     PubMedRetrievalService.retrieveCitationIds("26050619").stream()
         .forEach { cit -> println(cit) }

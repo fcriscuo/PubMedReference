@@ -23,8 +23,10 @@ data class PubMedEntry(
         Function to parse attributes from the PubMedArticle JaXB model object
         label should be one of (Origin, Reference, Citation)
          */
-        fun parsePubMedArticle(pubmedArticle: PubmedArticle, label:String = "Origin",
-                               parentId:String = ""): PubMedEntry {
+        fun parsePubMedArticle(
+            pubmedArticle: PubmedArticle, label: String = "Origin",
+            parentId: String = ""
+        ): PubMedEntry {
             val pmid = pubmedArticle.medlineCitation.pmid.getvalue()
             val pmcid = resolveArticleIdByType(pubmedArticle, "pmc")
             val doiid = resolveArticleIdByType(pubmedArticle, "doi")
@@ -39,7 +41,8 @@ data class PubMedEntry(
                 label, pmid, parentId,
                 pmcid, doiid, journalName, journalIssue, title,
                 abstract, authors, resolveReferenceIdSet(pubmedArticle),
-                citations, citations.size)
+                citations, citations.size
+            )
         }
 
 
@@ -48,7 +51,7 @@ data class PubMedEntry(
             pubmedArticle.pubmedData.referenceList.stream().forEach { refL ->
                 refL.reference.stream().forEach { ref ->
                     for (articleId in ref.articleIdList.articleId.stream()
-                        ) {
+                    ) {
                         refSet.add(articleId.getvalue())
                     }
                 }
@@ -59,7 +62,7 @@ data class PubMedEntry(
 
         private fun resolveAbstract(pubmedArticle: PubmedArticle): String {
 
-            val absTextList = pubmedArticle.medlineCitation.article.abstract.abstractText
+            val absTextList = pubmedArticle.medlineCitation.article?.abstract?.abstractText ?: listOf<AbstractText>()
             if (absTextList.isNotEmpty()) {
                 return absTextList[0].getvalue()
             }
@@ -95,6 +98,9 @@ data class PubMedEntry(
         private fun processAuthorName(author: Author): String {
             val authorNameList = author.lastNameOrForeNameOrInitialsOrSuffixOrCollectiveName
             var name = ""
+            if (authorNameList[0] is CollectiveName) {
+                return (authorNameList[0] as CollectiveName).getvalue()
+            }
             val lastName: LastName = authorNameList[0] as LastName
             name = lastName.getvalue()
             if (authorNameList.size > 1) {
@@ -109,28 +115,46 @@ data class PubMedEntry(
             return name
         }
 
+        fun processPagination(page: Pagination): String {
+            val medlinePgn = page.startPageOrEndPageOrMedlinePgn[0] as MedlinePgn
+            return medlinePgn.getvalue()
+        }
+
+        fun processELocation(eloc: ELocationID): String = eloc.getvalue()
+
+
         private fun resolveJournalIssue(pubmedArticle: PubmedArticle): String {
             var ret = ""
             val journalIssue = pubmedArticle.medlineCitation.article.journal.journalIssue
             val year = (journalIssue.pubDate.yearOrMonthOrDayOrSeasonOrMedlineDate[0] as Year).getvalue()
-            val vol = journalIssue.volume
-            val issue = journalIssue.issue
-            val pgn: String = if (pubmedArticle.medlineCitation.article.paginationOrELocationID.size > 0) {
-                val page = pubmedArticle.medlineCitation.article.paginationOrELocationID[0] as Pagination
-                val medlinePgn = page.startPageOrEndPageOrMedlinePgn[0] as MedlinePgn
-                medlinePgn.getvalue()
-            } else ""
-            if (vol.isNotEmpty()) {
-                ret = "$year $vol"
-                if (issue.isNotEmpty()) {
-                    ret = "$ret($issue)"
-                    if (pgn.isNotEmpty()) {
-                        ret = "$ret:${pgn.toString()}"
-                    }
+            val vol = journalIssue.volume ?: ""
+            val issue = journalIssue.issue ?: ""
+            var pgn:String = ""
+            if (pubmedArticle.medlineCitation.article.paginationOrELocationID.size > 0) {
+                 pgn = when (pubmedArticle.medlineCitation.article.paginationOrELocationID) {
+                    is Pagination -> processPagination(
+                        pubmedArticle.medlineCitation.article.paginationOrELocationID[0]
+                                as Pagination
+                    )
+                    else -> processELocation(
+                            pubmedArticle.medlineCitation.article.paginationOrELocationID[0]
+                                    as ELocationID
+                        )
                 }
             }
-            return ret
+
+        if (vol.isNotEmpty())
+        {
+            ret = "$year $vol"
+            if (issue.isNotEmpty()) {
+                ret = "$ret($issue)"
+                if (pgn.isNotEmpty()) {
+                    ret = "$ret:${pgn}"
+                }
+            }
         }
+        return ret
     }
+}
 
 }

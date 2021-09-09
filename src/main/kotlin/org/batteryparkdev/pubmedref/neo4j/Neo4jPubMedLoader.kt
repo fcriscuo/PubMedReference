@@ -40,7 +40,7 @@ object Neo4jPubMedLoader {
             " pma.article_title = \"TITLE\", pma.abstract = \"ABSTRACT\", " +
             " pma.author = \"AUTHOR\", pma.reference_count = REFCOUNT, " +
             " pma.cited_by_count = CITED_BY " +
-            "  RETURN pmr.pubmed_id"
+            "  RETURN pma.pubmed_id"
 
     private fun mergePubMedEntry(pubMedEntry: PubMedEntry): String {
         val merge = mergePubMedArticleTemplate.replace("PMAID", pubMedEntry.pubmedId)
@@ -48,6 +48,8 @@ object Neo4jPubMedLoader {
             .replace("DOIID", pubMedEntry.doiId)
             .replace("JOURNAL_NAME", pubMedEntry.journalName)
             .replace("JOURNAL_ISSUE", pubMedEntry.journalIssue)
+            .replace("TITLE", pubMedEntry.articleTitle)
+            .replace("ABSTRACT", modifyInternalQuotes(pubMedEntry.abstract))
             .replace("AUTHOR", pubMedEntry.authorCaption)
             .replace("REFCOUNT", pubMedEntry.referenceSet.size.toString())
             .replace("CITED_BY", pubMedEntry.citedByCount.toString())
@@ -99,10 +101,10 @@ object Neo4jPubMedLoader {
     private fun addLabel(pubmedId: String, label: String): String {
         // confirm that labels are novel
         val labelExistsQuery = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
-                "RETURN apoc.label.exists(pmr, \"$label\") AS output;"
+                "RETURN apoc.label.exists(pma, \"$label\") AS output;"
         val addLabelCypher = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
                 " CALL apoc.create.addLabels(pma, [\"$label\"] ) yield node return node"
-        if (Neo4jConnectionService.executeCypherCommand(labelExistsQuery) == "false") {
+        if (Neo4jConnectionService.executeCypherCommand(labelExistsQuery).uppercase() == "FALSE") {
             return Neo4jConnectionService.executeCypherCommand(addLabelCypher)
         }
         logger.atWarning().log("PubMedArticle node $pubmedId  already has label $label")
