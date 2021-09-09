@@ -50,9 +50,11 @@ data class PubMedEntry(
             val refSet = mutableSetOf<String>()
             pubmedArticle.pubmedData.referenceList.stream().forEach { refL ->
                 refL.reference.stream().forEach { ref ->
-                    for (articleId in ref.articleIdList.articleId.stream()
-                    ) {
-                        refSet.add(articleId.getvalue())
+                    if (ref.articleIdList != null) {
+                        for (articleId in ref.articleIdList.articleId.stream()
+                        ) {
+                            refSet.add(articleId.getvalue())
+                        }
                     }
                 }
             }
@@ -115,31 +117,34 @@ data class PubMedEntry(
             return name
         }
 
-        fun processPagination(page: Pagination): String {
+        private fun processPagination(page: Pagination): String {
             val medlinePgn = page.startPageOrEndPageOrMedlinePgn[0] as MedlinePgn
             return medlinePgn.getvalue()
         }
 
-        fun processELocation(eloc: ELocationID): String = eloc.getvalue()
+        private fun processELocation(eloc: ELocationID): String = eloc.getvalue()
 
 
         private fun resolveJournalIssue(pubmedArticle: PubmedArticle): String {
             var ret = ""
             val journalIssue = pubmedArticle.medlineCitation.article.journal.journalIssue
-            val year = (journalIssue.pubDate.yearOrMonthOrDayOrSeasonOrMedlineDate[0] as Year).getvalue()
+            val year = if (journalIssue.pubDate.yearOrMonthOrDayOrSeasonOrMedlineDate[0] is Year) {
+                (journalIssue.pubDate.yearOrMonthOrDayOrSeasonOrMedlineDate[0] as Year).getvalue()
+            } else ""
             val vol = journalIssue.volume ?: ""
             val issue = journalIssue.issue ?: ""
             var pgn:String = ""
             if (pubmedArticle.medlineCitation.article.paginationOrELocationID.size > 0) {
-                 pgn = when (pubmedArticle.medlineCitation.article.paginationOrELocationID) {
+                 pgn = when (pubmedArticle.medlineCitation.article.paginationOrELocationID[0]) {
                     is Pagination -> processPagination(
                         pubmedArticle.medlineCitation.article.paginationOrELocationID[0]
                                 as Pagination
                     )
-                    else -> processELocation(
+                   is ELocationID -> processELocation(
                             pubmedArticle.medlineCitation.article.paginationOrELocationID[0]
                                     as ELocationID
                         )
+                     else -> ""
                 }
             }
 

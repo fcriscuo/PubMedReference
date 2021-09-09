@@ -33,9 +33,11 @@ fun loadOriginNode(pubmedId: String): PubMedEntry {
 }
 
 fun loadCitationNodes(pubMedEntry: PubMedEntry){
+    logger.atInfo().log("Processing Citations")
     val parentId = pubMedEntry.pubmedId
     pubMedEntry.citationSet.stream().forEach { id ->
         run {
+            logger.atInfo().log("  Citation id: $id")
             val citEntry = resolvePubMedEntryById(id, "Citation", parentId)
             Neo4jPubMedLoader.loadPubMedEntry(citEntry)
             Thread.sleep(300L)  // Accommodate NCBI request rate limit
@@ -44,9 +46,11 @@ fun loadCitationNodes(pubMedEntry: PubMedEntry){
 }
 
 fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
+    logger.atInfo().log("Processing References")
     val parentId = pubMedEntry.pubmedId  // id of origin node
     pubMedEntry.referenceSet.stream().forEach { id ->
         run {
+            logger.atInfo().log("  Reference id: $id")
             val refEntry = resolvePubMedEntryById(id, "Reference", parentId)
             Neo4jPubMedLoader.loadPubMedEntry(refEntry)
             Thread.sleep(300L) // Accommodate NCBI request rate limit
