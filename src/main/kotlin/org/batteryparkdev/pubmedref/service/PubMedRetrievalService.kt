@@ -2,6 +2,7 @@ package org.batteryparkdev.pubmedref.service
 
 import ai.wisecube.pubmed.PubmedArticle
 import ai.wisecube.pubmed.PubmedParser
+import arrow.core.Either
 import com.google.common.flogger.FluentLogger
 import org.batteryparkdev.pubmedref.property.ApplicationPropertiesService
 import org.w3c.dom.Element
@@ -15,7 +16,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 object PubMedRetrievalService {
 
-    private val logger: FluentLogger = FluentLogger.forEnclosingClass();
+     val logger: FluentLogger = FluentLogger.forEnclosingClass();
 
     //    private val ncbiEmail = System.getenv("NCBI_EMAIL")
 //    private val ncbiApiKey = System.getenv("NCBI_API_KEY")
@@ -33,14 +34,23 @@ object PubMedRetrievalService {
                 "&id=PUBMEDID&&tool=my_tool&email=NCBIEMAIL&api_key=APIKEY"
     private const val pubMedToken = "PUBMEDID"
 
-    fun retrievePubMedArticle(pubmedId: String ): PubmedArticle {
+
+    /*
+    Return an Either<Exception, PubMedArticle to deal with NCBI
+    service disruptions
+     */
+    fun retrievePubMedArticle(pubmedId: String ): Either<Exception, PubmedArticle> {
         Thread.sleep(ncbiDelay)  // Accommodate NCBI maximum request rate
         val url = pubMedTemplate
             .replace(pubMedToken, pubmedId)
-        val text = URL(url).readText(Charset.defaultCharset())
-        val parser = PubmedParser()
-        val articleSet = parser.parse(text, ai.wisecube.pubmed.PubmedArticleSet::class.java)
-        return articleSet.pubmedArticleOrPubmedBookArticle[0] as PubmedArticle
+        return try {
+            val text = URL(url).readText(Charset.defaultCharset())
+            val parser = PubmedParser()
+            val articleSet = parser.parse(text, ai.wisecube.pubmed.PubmedArticleSet::class.java)
+            Either.Right(articleSet.pubmedArticleOrPubmedBookArticle[0] as PubmedArticle)
+        } catch (e: Exception) {
+            Either.Left(e)
+        }
     }
 
     fun retrieveCitationIds(pubmedId: String): Set<String> {
@@ -66,9 +76,16 @@ object PubMedRetrievalService {
 
 fun main() {
     // test PubMedArticle retrieval
-    val article = PubMedRetrievalService.retrievePubMedArticle("26050619")
-    println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
-    // test parsing citations from XML-formatted response
-    PubMedRetrievalService.retrieveCitationIds("26050619").stream()
-        .forEach { cit -> println(cit) }
+    when (val retEither =PubMedRetrievalService.retrievePubMedArticle("26050619")) {
+        is Either.Right -> {
+            val article = retEither.value
+            println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
+            PubMedRetrievalService.retrieveCitationIds("26050619").stream()
+                .forEach { cit -> println(cit) }
+        }
+        is Either.Left -> {
+            PubMedRetrievalService.logger.atInfo().log(" ${retEither.value.message}")
+        }
+    }
+
 }

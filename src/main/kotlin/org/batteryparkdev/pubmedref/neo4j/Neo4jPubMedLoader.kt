@@ -118,6 +118,6 @@ object Neo4jPubMedLoader {
     Double quotes (i.e. ") inside a text field causes Cypher
     processing errors
      */
-    fun modifyInternalQuotes(text: String): String =
+    private fun modifyInternalQuotes(text: String): String =
         text.replace("\"", "'")
 }

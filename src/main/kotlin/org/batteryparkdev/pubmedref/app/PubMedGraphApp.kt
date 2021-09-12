@@ -1,6 +1,7 @@
 package org.batteryparkdev.pubmedref.app
 
 import ai.wisecube.pubmed.PubmedParser
+import arrow.core.Either
 import com.google.common.flogger.FluentLogger
 import org.batteryparkdev.pubmedref.model.PubMedEntry
 import org.batteryparkdev.pubmedref.neo4j.Neo4jPubMedLoader
@@ -23,17 +24,16 @@ fun main(args: Array<String>) {
     Neo4jUtils.clearRelationshipsAndLabels()
     // load the origin node
     val pubmedEntry = loadOriginNode(pubmedId)
-    // load the reference nodes
-    loadReferenceNodes(pubmedEntry)
-    // load citations
-    loadCitationNodes(pubmedEntry)
+    if (pubmedEntry != null) {// load the reference  and citation nodes
+        loadReferenceNodes(pubmedEntry)
+        // load citations
+        loadCitationNodes(pubmedEntry)
+    }
 }
 
-fun loadOriginNode(pubmedId: String): PubMedEntry {
-    val pubmedEntry = resolvePubMedEntryById(pubmedId)
+fun loadOriginNode(pubmedId: String): PubMedEntry? {
     Neo4jUtils.deleteExistingOriginNode(pubmedId)
-    Neo4jPubMedLoader.loadPubMedEntry(pubmedEntry) // accept default values for parent any label
-    return pubmedEntry
+    return loadPubMedEntryById(pubmedId)
 }
 
 fun loadCitationNodes(pubMedEntry: PubMedEntry){
@@ -49,8 +49,7 @@ fun loadCitationNodes(pubMedEntry: PubMedEntry){
              */
             if (!Neo4jUtils.pubMedNodeExistsPredicate(id)) {
                 logger.atInfo().log("  Fetching citation  id: $id from NCBI")
-                val citEntry = resolvePubMedEntryById(id, label, parentId)
-                Neo4jPubMedLoader.loadPubMedEntry(citEntry)
+                val citEntry = loadPubMedEntryById(id, label, parentId)
             } else {
                 Neo4jUtils.createPubMedRelationship(label, parentId, id)
                 Neo4jUtils.addLabel(id,label)
@@ -68,8 +67,7 @@ fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
             logger.atInfo().log("  Reference id: $id")
             if (!Neo4jUtils.pubMedNodeExistsPredicate(id)) {
                 logger.atInfo().log("  Fetching reference id: $id from NCBI")
-                val refEntry = resolvePubMedEntryById(id, label, parentId)
-                Neo4jPubMedLoader.loadPubMedEntry(refEntry)
+                val refEntry = loadPubMedEntryById(id, label, parentId)
             } else {
                 Neo4jUtils.createPubMedRelationship(label, parentId, id)
                 Neo4jUtils.addLabel(id, label)
@@ -78,8 +76,21 @@ fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
     }
 }
 
-fun resolvePubMedEntryById(pubmedId: String, label: String = "Origin", parentId: String = ""): PubMedEntry {
-    val pubmedArticle = PubMedRetrievalService.retrievePubMedArticle(pubmedId)
-    return PubMedEntry.parsePubMedArticle(pubmedArticle, label, parentId)
+
+fun loadPubMedEntryById(pubmedId: String, label: String = "Origin", parentId: String = ""):PubMedEntry? {
+    return when (val retEither = PubMedRetrievalService.retrievePubMedArticle(pubmedId)) {
+        is Either.Right -> {
+            val pubmedArticle = retEither.value
+            val pubmedEntry = PubMedEntry.parsePubMedArticle(pubmedArticle, label, parentId)
+            Neo4jPubMedLoader.loadPubMedEntry(pubmedEntry)
+            pubmedEntry
+        }
+        is Either.Left -> {
+            logger.atSevere().log(retEither.value.message)
+            null
+        }
+    }
 }
+
+
 
