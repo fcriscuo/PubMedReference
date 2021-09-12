@@ -30,12 +30,18 @@ exposing Neo4j credentials. The application logs all Neo4j CYPHER commands to a 
 file in the /tmp/logs/neo4j directory. The filenames for these log files contain 
 a timestamp component, so they are not overwritten by subsequent executions.
 
-### Future Development Plans
+In an effort to reduce delays in accessing NCBI data, PubMedReference nodes are retained
+across application invocations. All node relationships are deleted as are all
+secondary labels at the start of the application's execution. The PubMed Id submitted
+is used to fetch data from NCBI even if that node already exists in the Neo4j database.
+But before data requests for reference and citation PubMed Ids are submitted to NCBI, 
+the database
+is queried to determine if those Ids have existing PubMedReference nodes. If so, the
+NCBI data request is skipped and an appropriate relationship to the Origin node is
+created and a secondary label is added.
 
-An immediate goal is to retain PubMedArticle nodes across multiple invocations in order
-to eliminate redundant query. All secondary labels (i.e. Origin, Reference, & Citation)
-will be removed as well as will all inter-PubMedArticle relationships. Before a PubMed article
-request is sent to NCBI, the existing pool of PubMedArticle nodes in the database
-will be searched for 
-an Id match. If a match is found, the existing node will simply be wired in with the
-appropriate label and relationship.
+The Origin node is reloaded regardless of whether it is already present in the database
+for two (2). First, it avoids keeping a permanent or transient list of a node's 
+relationships and secondary labels. Second, it ensures that any additional citations
+relating to the Origin node since it was last created are now represented.
+

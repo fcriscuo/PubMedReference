@@ -6,7 +6,7 @@ package org.batteryparkdev.pubmedref.neo4j
 
 import com.google.common.flogger.FluentLogger
 import com.google.common.flogger.StackSize
-import org.batteryparkdev.pubmedref.property.DatafilesPropertiesService
+import org.batteryparkdev.pubmedref.property.ApplicationPropertiesService
 import org.batteryparkdev.pubmedref.service.getEnvVariable
 import org.neo4j.driver.*
 import java.io.File
@@ -52,7 +52,10 @@ object Neo4jConnectionService {
     }
 
     fun executeCypherCommand(command: String): String {
-        Neo4jConnectionService.cypherFileWriter.write("$command\n")
+        if (command.uppercase().startsWith("MERGE ") ||
+                command.uppercase().startsWith("CREATE ")) {
+            cypherFileWriter.write("$command\n")
+        }
         val session = driver.session()
         lateinit var resultString: String
         session.use {
@@ -81,8 +84,8 @@ fun resolveCurrentTime (): String {
 }
 
 fun resolveCypherLogFileName() =
-    DatafilesPropertiesService.resolvePropertyAsString("neo4j.log.dir") +"/" +
-            DatafilesPropertiesService.resolvePropertyAsString("neo4j.log.file.prefix") +
+    ApplicationPropertiesService.resolvePropertyAsString("neo4j.log.dir") +"/" +
+            ApplicationPropertiesService.resolvePropertyAsString("neo4j.log.file.prefix") +
             "_" + resolveCurrentTime()+ ".log"
 
 

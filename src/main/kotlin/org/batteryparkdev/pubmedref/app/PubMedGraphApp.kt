@@ -4,6 +4,7 @@ import ai.wisecube.pubmed.PubmedParser
 import com.google.common.flogger.FluentLogger
 import org.batteryparkdev.pubmedref.model.PubMedEntry
 import org.batteryparkdev.pubmedref.neo4j.Neo4jPubMedLoader
+import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
 
 private val logger: FluentLogger = FluentLogger.forEnclosingClass();
@@ -18,6 +19,8 @@ private val parser = PubmedParser()
 fun main(args: Array<String>) {
     val pubmedId = if (args.isNotEmpty()) args[0] else defaultId
     logger.atInfo().log("Processing PubMed Id: $pubmedId")
+    // clear existing relationships and secondary labels
+    Neo4jUtils.clearRelationshipsAndLabels()
     // load the origin node
     val pubmedEntry = loadOriginNode(pubmedId)
     // load the reference nodes
@@ -28,19 +31,30 @@ fun main(args: Array<String>) {
 
 fun loadOriginNode(pubmedId: String): PubMedEntry {
     val pubmedEntry = resolvePubMedEntryById(pubmedId)
-    Neo4jPubMedLoader.loadPubMedEntry(pubmedEntry) // accept default values for parent anf label
+    Neo4jUtils.deleteExistingOriginNode(pubmedId)
+    Neo4jPubMedLoader.loadPubMedEntry(pubmedEntry) // accept default values for parent any label
     return pubmedEntry
 }
 
 fun loadCitationNodes(pubMedEntry: PubMedEntry){
     logger.atInfo().log("Processing Citations")
     val parentId = pubMedEntry.pubmedId
+    val label = "Citation"
     pubMedEntry.citationSet.stream().forEach { id ->
         run {
             logger.atInfo().log("  Citation id: $id")
-            val citEntry = resolvePubMedEntryById(id, "Citation", parentId)
-            Neo4jPubMedLoader.loadPubMedEntry(citEntry)
-            Thread.sleep(300L)  // Accommodate NCBI request rate limit
+            /*
+            Only fetch the PubMed data from NCBI if the database does not
+            contain a PubMedReference node for this citation id
+             */
+            if (!Neo4jUtils.pubMedNodeExistsPredicate(id)) {
+                logger.atInfo().log("  Fetching citation  id: $id from NCBI")
+                val citEntry = resolvePubMedEntryById(id, label, parentId)
+                Neo4jPubMedLoader.loadPubMedEntry(citEntry)
+            } else {
+                Neo4jUtils.createPubMedRelationship(label, parentId, id)
+                Neo4jUtils.addLabel(id,label)
+            }
         }
     }
 }
@@ -48,12 +62,18 @@ fun loadCitationNodes(pubMedEntry: PubMedEntry){
 fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
     logger.atInfo().log("Processing References")
     val parentId = pubMedEntry.pubmedId  // id of origin node
+    val label = "Reference"
     pubMedEntry.referenceSet.stream().forEach { id ->
         run {
             logger.atInfo().log("  Reference id: $id")
-            val refEntry = resolvePubMedEntryById(id, "Reference", parentId)
-            Neo4jPubMedLoader.loadPubMedEntry(refEntry)
-            Thread.sleep(300L) // Accommodate NCBI request rate limit
+            if (!Neo4jUtils.pubMedNodeExistsPredicate(id)) {
+                logger.atInfo().log("  Fetching reference id: $id from NCBI")
+                val refEntry = resolvePubMedEntryById(id, label, parentId)
+                Neo4jPubMedLoader.loadPubMedEntry(refEntry)
+            } else {
+                Neo4jUtils.createPubMedRelationship(label, parentId, id)
+                Neo4jUtils.addLabel(id, label)
+            }
         }
     }
 }

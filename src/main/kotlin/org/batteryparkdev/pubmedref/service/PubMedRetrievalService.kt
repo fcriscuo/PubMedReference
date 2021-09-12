@@ -3,6 +3,7 @@ package org.batteryparkdev.pubmedref.service
 import ai.wisecube.pubmed.PubmedArticle
 import ai.wisecube.pubmed.PubmedParser
 import com.google.common.flogger.FluentLogger
+import org.batteryparkdev.pubmedref.property.ApplicationPropertiesService
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.w3c.dom.NodeList
@@ -22,6 +23,8 @@ object PubMedRetrievalService {
     private val ncbiApiKey = "8ea2dc1ff16df40319a83d259764f641a208"
     private val dbFactory = DocumentBuilderFactory.newInstance()
     private val dBuilder = dbFactory.newDocumentBuilder()
+    private val ncbiDelay:Long =
+        ApplicationPropertiesService.resolvePropertyAsLong("ncbi.request.delay.milliseconds")
 
     private const val pubMedTemplate =
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
@@ -30,7 +33,8 @@ object PubMedRetrievalService {
                 "&id=PUBMEDID&&tool=my_tool&email=NCBIEMAIL&api_key=APIKEY"
     private const val pubMedToken = "PUBMEDID"
 
-    fun retrievePubMedArticle(pubmedId: String): PubmedArticle {
+    fun retrievePubMedArticle(pubmedId: String ): PubmedArticle {
+        Thread.sleep(ncbiDelay)  // Accommodate NCBI maximum request rate
         val url = pubMedTemplate
             .replace(pubMedToken, pubmedId)
         val text = URL(url).readText(Charset.defaultCharset())

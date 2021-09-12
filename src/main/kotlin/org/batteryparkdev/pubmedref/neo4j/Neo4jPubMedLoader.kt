@@ -17,17 +17,20 @@ object Neo4jPubMedLoader {
          */
         if (!pubMedNodeExistsPredicate(pubMedEntry.pubmedId)) {
             val newPubMedId = mergePubMedEntry(pubMedEntry)
-            logger.atFine().log("PubMed Id $newPubMedId  loaded into Neo4j")
+            logger.atInfo().log("PubMed Id $newPubMedId  loaded into Neo4j")
+        } else {
+            logger.atInfo().log("PubMed Id ${pubMedEntry.pubmedId}  already loaded into Neo4j")
         }
         if (pubMedEntry.parentPubMedId.isNotEmpty()) {
-            val r = createPubMedRelationship(pubMedEntry)
-            logger.atFine().log(
+            val r = Neo4jUtils.createPubMedRelationship(pubMedEntry.label, pubMedEntry.parentPubMedId,
+                pubMedEntry.pubmedId)
+            logger.atInfo().log(
                 "${pubMedEntry.label} relationship between ids ${pubMedEntry.parentPubMedId} " +
                         " and ${pubMedEntry.pubmedId} created"
             )
         }
 
-            val l = addLabel(pubMedEntry.pubmedId, pubMedEntry.label)
+            val l = Neo4jUtils.addLabel(pubMedEntry.pubmedId, pubMedEntry.label)
             if (l.isNotEmpty()) {
                 logger.atFine().log("Added label: ${pubMedEntry.label} to PubMedArticle node for ${pubMedEntry.pubmedId}")
 
@@ -77,7 +80,7 @@ object Neo4jPubMedLoader {
     /*
     Function to determine if the PubMed data is already in the database
      */
-    private fun pubMedNodeExistsPredicate(pubmedId: String): Boolean {
+   fun pubMedNodeExistsPredicate(pubmedId: String): Boolean {
         val cypher = "OPTIONAL MATCH (p:PubMedArticle{pubmed_id: $pubmedId }) " +
                 " RETURN p IS NOT NULL AS Predicate"
         try {
