@@ -11,8 +11,8 @@ import java.util.*
  * Created by fcriscuo on 7/27/21.
  */
 abstract class AbstractPropertiesService {
-     val properties: Properties = Properties()
-    val logger: FluentLogger = FluentLogger.forEnclosingClass();
+     private val properties: Properties = Properties()
+    private val logger: FluentLogger = FluentLogger.forEnclosingClass();
     fun resolveFrameworkProperties(propertiesFile: String) {
         val stream = AbstractPropertiesService::class.java.getResourceAsStream(propertiesFile)
         //val p = Properties()
@@ -36,7 +36,7 @@ abstract class AbstractPropertiesService {
         }
 
 
-    fun resolvePropertyAsStringOption(propertyName: String): Option<String> =
+    private fun resolvePropertyAsStringOption(propertyName: String): Option<String> =
         if (properties.containsKey(propertyName)) {
             logger.atInfo().log("Property Value: ${properties.getProperty(propertyName)}")
             Some(properties.getProperty(propertyName).toString())
@@ -50,6 +50,13 @@ abstract class AbstractPropertiesService {
             properties.getProperty(propertyName).toIntOrNull()
         } else {
             null
+        }
+
+    fun resolvePropertyAsLong(propertyName: String): Long =
+        if (properties.containsKey(propertyName)) {
+            properties.getProperty(propertyName).toLongOrNull() ?: 0L
+        } else {
+            0L
         }
 
     fun resolvePropertyAsResourcePathOption(propertyName: String): Option<Path> {
