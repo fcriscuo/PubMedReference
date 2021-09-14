@@ -9,7 +9,8 @@ import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
 
 private val logger: FluentLogger = FluentLogger.forEnclosingClass();
-const val defaultId = "26050619"
+val defaultIdList = listOf("26050619","32946445","28875994")
+
 const val pubMedTemplate =
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
 const val pubMedToken = "PUBMEDID"
@@ -17,23 +18,39 @@ const val startTag = "<PubmedArticleSet>"
 const val UTF8_BOM = "\uFEFF"
 private val parser = PubmedParser()
 
+/*
+Add support for multiple origin pubmed ids
+ */
 fun main(args: Array<String>) {
-    val pubmedId = if (args.isNotEmpty()) args[0] else defaultId
-    logger.atInfo().log("Processing PubMed Id: $pubmedId")
+    val pubmedIdList = if (args.isNotEmpty()) listOf(*args) else defaultIdList
     // clear existing relationships and secondary labels
     Neo4jUtils.clearRelationshipsAndLabels()
     // load the origin node
-    val pubmedEntry = loadOriginNode(pubmedId)
-    if (pubmedEntry != null) {// load the reference  and citation nodes
-        loadReferenceNodes(pubmedEntry)
-        // load citations
-        loadCitationNodes(pubmedEntry)
+    val originList = loadOriginNodes(pubmedIdList)
+    originList.forEach {
+        run {
+            loadReferenceNodes(it)
+            loadCitationNodes(it)
+        }
     }
 }
 
-fun loadOriginNode(pubmedId: String): PubMedEntry? {
-    Neo4jUtils.deleteExistingOriginNode(pubmedId)
-    return loadPubMedEntryById(pubmedId)
+/*
+Load all the Origin nodes individually
+ */
+fun loadOriginNodes(pubmedIdList: List<String>): List<PubMedEntry> {
+    val entryList = mutableListOf<PubMedEntry>()
+    pubmedIdList.forEach {
+        run {
+            logger.atInfo().log("Processing PubMed Id: $it")
+            Neo4jUtils.deleteExistingOriginNode(it)
+            val entry = loadPubMedEntryById(it)
+            if (entry != null) {
+                entryList.add(entry)
+            }
+        }
+    }
+    return entryList.toList()
 }
 
 fun loadCitationNodes(pubMedEntry: PubMedEntry){
