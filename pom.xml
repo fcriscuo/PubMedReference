@@ -69,6 +69,14 @@
     </pluginRepositories>
 
     <dependencies>
+        <!-- add local pubmed parser dependency -->
+        <dependency>
+            <groupId>ai.wisecube</groupId>
+            <artifactId>pubmed</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/pubmed-parser.jar</systemPath>
+        </dependency>
         <!-- Neo4j front end requires scala 2.12.13-->
         <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-library -->
         <dependency>
@@ -491,6 +499,19 @@
                         </dependency>
 
                     </dependencies>
+                </plugin>
+                <plugin>
+                <groupId>org.jvnet.jaxb2.maven2</groupId>
+                <artifactId>maven-jaxb2-plugin</artifactId>
+                <version>0.14.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.glassfish.jaxb</groupId>
+                        <artifactId>jaxb-runtime</artifactId>
+                        <version>2.3.3</version>
+                    </dependency>
+                </dependencies>
+                    <executions/>
                 </plugin>
 <!--                <plugin>-->
 <!--                    <artifactId>kotlin-maven-plugin</artifactId>-->

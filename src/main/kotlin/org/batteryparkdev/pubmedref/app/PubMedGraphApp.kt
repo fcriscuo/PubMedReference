@@ -7,6 +7,7 @@ import org.batteryparkdev.pubmedref.model.PubMedEntry
 import org.batteryparkdev.pubmedref.neo4j.Neo4jPubMedLoader
 import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
+import java.util.stream.Stream
 
 const val pubMedTemplate =
     "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
@@ -17,7 +18,7 @@ const val UTF8_BOM = "\uFEFF"
 class PubMedGraphApp {
     private val logger: FluentLogger = FluentLogger.forEnclosingClass();
 
-    private val parser = PubmedParser()
+    //private val parser = PubmedParser()
 
     companion object {
        @JvmStatic fun main(args: Array<String>) {
@@ -27,6 +28,13 @@ class PubMedGraphApp {
             Neo4jUtils.clearRelationshipsAndLabels()
             pubmedIdList.forEach { it -> PubMedGraphApp().processPubMedNodeById(it.toInt()) }
         }
+
+//        @JvmStatic fun processPubMedIdStream (ids: Stream<Int>) {
+//            val app = PubMedGraphApp()
+//            Neo4jUtils.clearRelationshipsAndLabels()
+//            ids.filter { it > 0 }
+//                .forEach { it -> app.processPubMedNodeById(it) }
+//        }
     }
     /*
 Add support for multiple origin pubmed ids
