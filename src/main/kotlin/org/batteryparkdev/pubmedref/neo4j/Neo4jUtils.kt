@@ -75,6 +75,16 @@ object Neo4jUtils {
         }
     }
 
+    fun deleteExistingPubMedArticleNodes() {
+        val nodeCount = Neo4jConnectionService.executeCypherCommand(
+            "MATCH (pma:PubMedArticle) RETURN COUNT(pma)"
+        )
+        Neo4jConnectionService.executeCypherCommand(
+            "MATCH (pma: PubMedArticle) DETACH DELETE(pma)"
+        )
+        logger.atInfo().log(" $nodeCount PubMedArticles deleted")
+    }
+
      fun createPubMedRelationship(label:String, parentPubMedId:String, pubmedId: String): String {
         val command = when (label.uppercase()) {
             "REFERENCE" -> "MATCH (parent:PubMedArticle), (child:PubMedArticle) WHERE " +

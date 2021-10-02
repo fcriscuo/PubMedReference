@@ -21,30 +21,14 @@ class PubMedGraphApp {
     //private val parser = PubmedParser()
 
     companion object {
-       @JvmStatic fun main(args: Array<String>) {
-           val defaultIdList = listOf("25303977", "33024263", "28467829")
-            val pubmedIdList = if (args.isNotEmpty()) listOf(*args) else defaultIdList
-            // clear existing relationships and secondary labels
+        @JvmStatic fun processPubMedIdStream (ids: Stream<Int>) {
+            val app = PubMedGraphApp()
             Neo4jUtils.clearRelationshipsAndLabels()
-            pubmedIdList.forEach { it -> PubMedGraphApp().processPubMedNodeById(it.toInt()) }
+            ids.filter { it > 0 }
+                .forEach { it -> app.processPubMedNodeById(it) }
         }
-
-//        @JvmStatic fun processPubMedIdStream (ids: Stream<Int>) {
-//            val app = PubMedGraphApp()
-//            Neo4jUtils.clearRelationshipsAndLabels()
-//            ids.filter { it > 0 }
-//                .forEach { it -> app.processPubMedNodeById(it) }
-//        }
     }
-    /*
-Add support for multiple origin pubmed ids
- */
-//    fun main(args: Array<String>) {
-//        val pubmedIdList = if (args.isNotEmpty()) listOf(*args) else defaultIdList
-//        // clear existing relationships and secondary labels
-//        Neo4jUtils.clearRelationshipsAndLabels()
-//        pubmedIdList.forEach { it -> processPubMedNodeById(it.toInt()) }
-//    }
+
 
     fun processPubMedNodeById(pubmedId: Int) {
         val originEntry = loadOriginNodes(pubmedId.toString())
@@ -119,5 +103,14 @@ Load all the Origin nodes individually
     }
 }
 
+/*
+Add support for multiple origin pubmed ids
+*/
+fun main() {
+    val pubmedIdStream = listOf(25303977, 33024263, 28467829).stream()
 
+    // clear existing relationships and secondary labels
+    Neo4jUtils.clearRelationshipsAndLabels()
+   PubMedGraphApp.processPubMedIdStream(pubmedIdStream)
+}
 

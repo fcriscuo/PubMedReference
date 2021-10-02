@@ -18,11 +18,11 @@ A Neo4j CITED_BY relationship is created between the Origin node and each Citati
 
 This application utilizes the pubmed-parser library available from the thecloudcircle
 account on GitHub (https://github.com/thecloudcircle/pubmed-parser) to map XML data
-received from PubMed to Java JAXB objects.
+received from PubMed to Java JAXB objects. This library requires a JRE of 15 or lower.
 
-NCBI enforces a limit of three (3) API requests per second 
-(10 with a registered API key). To accommodate that restriction
-application pauses for 300 milliseconds after 
+NCBI actively enforces a limit of three (3) API requests per second 
+(10 with a registered API key). To accommodate this restriction,
+the application pauses for 300 milliseconds after 
 each request.
 
 The application requires the user to define two (2) system environment properties, 
@@ -47,3 +47,10 @@ for two (2) reasons. First, it avoids keeping a permanent or transient list of a
 relationships and secondary labels. Second, it ensures that any additional citations
 relating to an Origin node since it was last created are now represented.
 
+### Support for COSMIC PubMed Ids
+
+The application has been modified to support mining PubMed data from NCBI using
+PubMed Ids listing in COSMIC tsv files. The Kotlin class 
+org.batteryparkdev.pubmedref.app.CosmicPubMedLoaderApp can be invokes with the full path
+name of the COSMIC file. The column name for PubMed Ids should be Pubmed_PMID. Given NCBI's
+request rate limit, processing a large COSMIC file will require several hours.

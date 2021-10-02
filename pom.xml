@@ -614,7 +614,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <jvmTarget>16</jvmTarget>
+                    <jvmTarget>15</jvmTarget>
                 </configuration>
             </plugin>
             <plugin>
@@ -622,9 +622,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
                 <configuration>
-                    <release>16</release>
-                    <source>16</source>
-                    <target>16</target>
+                    <release>15</release>
+                    <source>15</source>
+                    <target>15</target>
                 </configuration>
                 <executions>
                     <execution>

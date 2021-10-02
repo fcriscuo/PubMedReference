@@ -84,18 +84,19 @@ data class PubMedEntry(
         e.g.  Smith, Robert; Jones, Mary, et al
          */
         private fun generateAuthorCaption(pubmedArticle: PubmedArticle): String {
-            val authorList = pubmedArticle.medlineCitation.article.authorList.author
-            val ret = when (authorList.size) {
-                0 -> ""
-                1 -> processAuthorName(authorList[0])
-                2 -> processAuthorName(authorList[0]) + "; " +
-                        processAuthorName(authorList[1])
-                else -> processAuthorName(authorList[0]) + "; " +
-                        processAuthorName(authorList[1]) + "; et al"
-
-
+            if (null != pubmedArticle.medlineCitation.article.authorList) {
+                val authorList = pubmedArticle.medlineCitation.article.authorList.author
+                val ret = when (authorList.size) {
+                    0 -> ""
+                    1 -> processAuthorName(authorList[0])
+                    2 -> processAuthorName(authorList[0]) + "; " +
+                            processAuthorName(authorList[1])
+                    else -> processAuthorName(authorList[0]) + "; " +
+                            processAuthorName(authorList[1]) + "; et al"
+                }
+                return ret
             }
-            return ret
+            return ""
         }
 
         private fun processAuthorName(author: Author): String {
