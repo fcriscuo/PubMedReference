@@ -29,7 +29,6 @@ object Neo4jPubMedLoader {
                         " and ${pubMedEntry.pubmedId} created"
             )
         }
-
             val l = Neo4jUtils.addLabel(pubMedEntry.pubmedId, pubMedEntry.label)
             if (l.isNotEmpty()) {
                 logger.atFine().log("Added label: ${pubMedEntry.label} to PubMedArticle node for ${pubMedEntry.pubmedId}")
@@ -52,7 +51,7 @@ object Neo4jPubMedLoader {
             .replace("JOURNAL_NAME", pubMedEntry.journalName)
             .replace("JOURNAL_ISSUE", pubMedEntry.journalIssue)
             .replace("TITLE", pubMedEntry.articleTitle)
-            .replace("ABSTRACT", modifyInternalQuotes(pubMedEntry.abstract))
+            .replace("ABSTRACT",pubMedEntry.abstract)
             .replace("AUTHOR", pubMedEntry.authorCaption)
             .replace("REFCOUNT", pubMedEntry.referenceSet.size.toString())
             .replace("CITED_BY", pubMedEntry.citedByCount.toString())
@@ -114,10 +113,4 @@ object Neo4jPubMedLoader {
         return ""
     }
 
-    /*
-    Double quotes (i.e. ") inside a text field causes Cypher
-    processing errors
-     */
-    private fun modifyInternalQuotes(text: String): String =
-        text.replace("\"", "'")
 }

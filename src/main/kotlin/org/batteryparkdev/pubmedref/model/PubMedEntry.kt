@@ -18,7 +18,7 @@ data class PubMedEntry(
     val citationSet: Set<String>,
     val citedByCount: Int
 ) {
-    companion object {
+    companion object: AbstractModel {
         /*
         Function to parse attributes from the PubMedArticle JaXB model object
         label should be one of (Origin, Reference, Citation)
@@ -33,8 +33,10 @@ data class PubMedEntry(
             val authors = generateAuthorCaption(pubmedArticle)
             val journalName = pubmedArticle.medlineCitation.article.journal.title
             val journalIssue = resolveJournalIssue(pubmedArticle)
-            val title = pubmedArticle.medlineCitation.article.articleTitle.getvalue()
-            val abstract = resolveAbstract(pubmedArticle)
+            val title =
+                removeInternalQuotes(pubmedArticle.medlineCitation.article.articleTitle.getvalue())
+            val abstract =  removeInternalQuotes(
+                resolveAbstract(pubmedArticle))
             val citations = PubMedRetrievalService.retrieveCitationIds(pmid)
 
             return PubMedEntry(
@@ -44,7 +46,6 @@ data class PubMedEntry(
                 citations, citations.size
             )
         }
-
 
         private fun resolveReferenceIdSet(pubmedArticle: PubmedArticle): Set<String> {
             val refSet = mutableSetOf<String>()
@@ -83,18 +84,19 @@ data class PubMedEntry(
         e.g.  Smith, Robert; Jones, Mary, et al
          */
         private fun generateAuthorCaption(pubmedArticle: PubmedArticle): String {
-            val authorList = pubmedArticle.medlineCitation.article.authorList.author
-            val ret = when (authorList.size) {
-                0 -> ""
-                1 -> processAuthorName(authorList[0])
-                2 -> processAuthorName(authorList[0]) + "; " +
-                        processAuthorName(authorList[1])
-                else -> processAuthorName(authorList[0]) + "; " +
-                        processAuthorName(authorList[1]) + "; et al"
-
-
+            if (null != pubmedArticle.medlineCitation.article.authorList) {
+                val authorList = pubmedArticle.medlineCitation.article.authorList.author
+                val ret = when (authorList.size) {
+                    0 -> ""
+                    1 -> processAuthorName(authorList[0])
+                    2 -> processAuthorName(authorList[0]) + "; " +
+                            processAuthorName(authorList[1])
+                    else -> processAuthorName(authorList[0]) + "; " +
+                            processAuthorName(authorList[1]) + "; et al"
+                }
+                return ret
             }
-            return ret
+            return ""
         }
 
         private fun processAuthorName(author: Author): String {
@@ -106,12 +108,12 @@ data class PubMedEntry(
             val lastName: LastName = authorNameList[0] as LastName
             name = lastName.getvalue()
             if (authorNameList.size > 1) {
-                val firstName = authorNameList[1] as ForeName
-                name = "$name, ${firstName.getvalue()}"
-            }
-            if (authorNameList.size > 2) {
-                val initials = authorNameList[2] as Initials
-                name = "$name ${initials.getvalue()}"
+                val name1  = when (authorNameList[1]) {
+                    is ForeName -> (authorNameList[1] as ForeName).getvalue()
+                    is Initials -> (authorNameList[1] as Initials).getvalue()
+                    else -> (authorNameList[1] as Suffix).getvalue()
+                }
+                name = "$name, $name1"
             }
 
             return name

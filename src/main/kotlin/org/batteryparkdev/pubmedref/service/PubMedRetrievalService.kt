@@ -58,17 +58,22 @@ object PubMedRetrievalService {
             .replace("NCBIEMAIL", ncbiEmail)
             .replace("APIKEY", ncbiApiKey)
         val citationSet = mutableSetOf<String>()
-        val text = URL(url).readText(Charset.defaultCharset())
-        val xmlDoc = dBuilder.parse(InputSource(StringReader(text)));
-        xmlDoc.documentElement.normalize()
-        val citationList: NodeList = xmlDoc.getElementsByTagName("Link")
-        for (i in 0 until citationList.length) {
-            val citationNode = citationList.item(i)
-            if (citationNode.nodeType == Node.ELEMENT_NODE) {
-                val elem = citationNode as Element
-                val id = elem.getElementsByTagName("Id").item(0).textContent
-                citationSet.add(id)
+        try {
+            val text = URL(url).readText(Charset.defaultCharset())
+            val xmlDoc = dBuilder.parse(InputSource(StringReader(text)));
+            xmlDoc.documentElement.normalize()
+            val citationList: NodeList = xmlDoc.getElementsByTagName("Link")
+            for (i in 0 until citationList.length) {
+                val citationNode = citationList.item(i)
+                if (citationNode.nodeType == Node.ELEMENT_NODE) {
+                    val elem = citationNode as Element
+                    val id = elem.getElementsByTagName("Id").item(0).textContent
+                    citationSet.add(id)
+                }
             }
+        } catch (e: Exception) {
+            logger.atWarning().log("++++  EXCEPTION getting citation set for $pubmedId")
+            logger.atWarning().log(e.message)
         }
         return citationSet.toSet()
     }
