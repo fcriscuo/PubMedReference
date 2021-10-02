@@ -19,7 +19,6 @@ private val parser = PubmedParser()
 
 fun main(args: Array<String>) {
     val pubmedId = if (args.isNotEmpty()) args[0] else defaultId
-    logger.atInfo().log("Processing PubMed Id: $pubmedId")
     // clear existing relationships and secondary labels
     Neo4jUtils.clearRelationshipsAndLabels()
     // load the origin node
@@ -32,6 +31,7 @@ fun main(args: Array<String>) {
 }
 
 fun loadOriginNode(pubmedId: String): PubMedEntry? {
+    println("Loading PubMed Id $pubmedId")
     Neo4jUtils.deleteExistingOriginNode(pubmedId)
     return loadPubMedEntryById(pubmedId)
 }

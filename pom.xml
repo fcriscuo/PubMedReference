@@ -69,6 +69,15 @@
     </pluginRepositories>
 
     <dependencies>
+        <!-- add local pubmed parser dependency -->
+        <dependency>
+            <groupId>ai.wisecube</groupId>
+            <artifactId>pubmed</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/pubmed-parser.jar</systemPath>
+        </dependency>
+
         <!-- Neo4j front end requires scala 2.12.13-->
         <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-library -->
         <dependency>
@@ -593,7 +602,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <jvmTarget>16</jvmTarget>
+                    <jvmTarget>15</jvmTarget>
                 </configuration>
             </plugin>
             <plugin>
@@ -601,9 +610,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
                 <configuration>
-                    <release>16</release>
-                    <source>16</source>
-                    <target>16</target>
+                    <release>15</release>
+                    <source>15</source>
+                    <target>15</target>
                 </configuration>
                 <executions>
                     <execution>
