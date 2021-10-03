@@ -2,6 +2,7 @@ package org.batteryparkdev.pubmedref.app
 
 import com.google.common.base.Stopwatch
 import com.google.common.flogger.FluentLogger
+import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.TsvRecordSequenceSupplier
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
@@ -29,6 +30,23 @@ class CosmicPubMedLoaderApp  (val cosmicTsvFile: String){
                     .forEach{ app.processPubMedNodeById(it)}
             }
     }
+    
+    fun loadCosmicPubMedDataBatch() {
+        val path = Paths.get(cosmicTsvFile)
+        val app = PubMedGraphApp()
+        val idList = mutableListOf<String>()
+        TsvRecordSequenceSupplier(path).get().chunked(30)
+            .forEach { it ->
+                it.stream()
+                    .map { it.get(pubmedIdCol) }
+                    .filter {it.isNotEmpty()  }  // ignore records w/o pubmedId value
+                    .filter{!Neo4jUtils.existingOriginPubMedIdPredicate(it)}
+                    .forEach { idList.add(it) }
+
+            }
+        logger.atInfo().log("++++ PubMed batch size = ${idList.size}")
+       app.loadOriginNodesByBatch(idList.joinToString(separator = ","))
+    }
 }
 private fun parseValidIntegerFromString(s: String): Int =
     when (s.toIntOrNull()) {
@@ -38,7 +56,7 @@ private fun parseValidIntegerFromString(s: String): Int =
 
 fun main(args: Array<String>) {
     val cosmicTsvFile =
-        when (args.size > 0) {
+        when (args.isNotEmpty()) {
             true -> args[0]
             false -> "./data/sample_CosmicMutantExportCensus.tsv"
         }
@@ -48,7 +66,8 @@ fun main(args: Array<String>) {
 
     if (cosmicTsvFile.isNotEmpty()) {
         val timer = Stopwatch.createStarted()
-        CosmicPubMedLoaderApp(cosmicTsvFile).loadCosmicPubMedData()
+       // CosmicPubMedLoaderApp(cosmicTsvFile).loadCosmicPubMedData()
+        CosmicPubMedLoaderApp(cosmicTsvFile).loadCosmicPubMedDataBatch()
         timer.stop()
         println("++++ COSMIC PubMed data loaded  in ${timer.elapsed(TimeUnit.MINUTES)} minutes+++")
     }

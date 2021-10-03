@@ -99,13 +99,27 @@ object Neo4jUtils {
         return Neo4jConnectionService.executeCypherCommand(command)
     }
 
-     fun addLabel(pubmedId: String, label: String): String {
-        // confirm that label is novel
+     fun labelExistsPredicate(pubmedId: String, label: String):Boolean {
         val labelExistsQuery = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
                 "RETURN apoc.label.exists(pma, \"$label\") AS output;"
+         return when (Neo4jConnectionService.executeCypherCommand(labelExistsQuery).uppercase()) {
+             "FALSE" -> false
+             else -> true
+         }
+     }
+
+    /*
+   Function to avoid processing the same Origin node more than once
+    */
+     fun existingOriginPubMedIdPredicate(pubmedId:String): Boolean =
+        Neo4jUtils.pubMedNodeExistsPredicate(pubmedId) &&
+                Neo4jUtils.labelExistsPredicate(pubmedId, "Origin")
+
+     fun addLabel(pubmedId: String, label: String): String {
+        // confirm that label is novel
         val addLabelCypher = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
                 " CALL apoc.create.addLabels(pma, [\"$label\"] ) yield node return node"
-        if (Neo4jConnectionService.executeCypherCommand(labelExistsQuery).uppercase() == "FALSE") {
+        if (!labelExistsPredicate(pubmedId, label)) {
             return Neo4jConnectionService.executeCypherCommand(addLabelCypher)
         }
         logger.atWarning().log("PubMedArticle node $pubmedId  already has label $label")

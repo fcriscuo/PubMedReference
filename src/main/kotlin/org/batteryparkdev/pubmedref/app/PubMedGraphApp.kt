@@ -21,14 +21,14 @@ class PubMedGraphApp {
     //private val parser = PubmedParser()
 
     companion object {
-        @JvmStatic fun processPubMedIdStream (ids: Stream<Int>) {
+        @JvmStatic
+        fun processPubMedIdStream(ids: Stream<Int>) {
             val app = PubMedGraphApp()
             Neo4jUtils.clearRelationshipsAndLabels()
             ids.filter { it > 0 }
                 .forEach { it -> app.processPubMedNodeById(it) }
         }
     }
-
 
     fun processPubMedNodeById(pubmedId: Int) {
         val originEntry = loadOriginNodes(pubmedId.toString())
@@ -38,16 +38,29 @@ class PubMedGraphApp {
         }
     }
 
+    fun loadOriginNodesByBatch(batchIds: String) {
+//        batchIds.splitToSequence("")
+//            .forEach { id -> Neo4jUtils.deleteExistingOriginNode(id) }
+        loadPubMedEntryByIdBatch(batchIds).stream()
+            .filter { null != it }
+            .forEach {
+                run {
+                    loadReferenceNodes(it)
+                    loadCitationNodes(it)
+                }
+            }
+    }
+
     /*
 Load all the Origin nodes individually
  */
-    fun loadOriginNodes(pubmedId: String): PubMedEntry? {
+    private fun loadOriginNodes(pubmedId: String): PubMedEntry? {
         logger.atFine().log("Processing PubMed Id: $pubmedId")
         Neo4jUtils.deleteExistingOriginNode(pubmedId)
         return loadPubMedEntryById(pubmedId)
     }
 
-    fun loadCitationNodes(pubMedEntry: PubMedEntry) {
+    private fun loadCitationNodes(pubMedEntry: PubMedEntry) {
         logger.atInfo().log("Processing Citations")
         val parentId = pubMedEntry.pubmedId
         val label = "Citation"
@@ -69,7 +82,7 @@ Load all the Origin nodes individually
         }
     }
 
-    fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
+    private fun loadReferenceNodes(pubMedEntry: PubMedEntry) {
         logger.atInfo().log("Processing References")
         val parentId = pubMedEntry.pubmedId  // id of origin node
         val label = "Reference"
@@ -87,7 +100,32 @@ Load all the Origin nodes individually
         }
     }
 
-    fun loadPubMedEntryById(pubmedId: String, label: String = "Origin", parentId: String = ""): PubMedEntry? {
+    private fun loadPubMedEntryByIdBatch(
+        pubmedIdBatch: String,
+        label: String = "Origin",
+        parentId: String = ""
+    ): List<PubMedEntry> {
+        val entryList = mutableListOf<PubMedEntry>()
+        return when (val retEither = PubMedRetrievalService.retrievePubMedArticleStream(pubmedIdBatch)) {
+            is Either.Right -> {
+                val pubmedArticleStream = retEither.value
+                pubmedArticleStream.forEach { article ->
+                    run {
+                        val pubmedEntry = PubMedEntry.parsePubMedArticle(article, label, parentId)
+                        Neo4jPubMedLoader.loadPubMedEntry(pubmedEntry)
+                        entryList.add(pubmedEntry)
+                    }
+                }
+                entryList
+            }
+            is Either.Left -> {
+                logger.atSevere().log(retEither.value.message)
+                entryList
+            }
+        }
+    }
+
+    private fun loadPubMedEntryById(pubmedId: String, label: String = "Origin", parentId: String = ""): PubMedEntry? {
         return when (val retEither = PubMedRetrievalService.retrievePubMedArticle(pubmedId)) {
             is Either.Right -> {
                 val pubmedArticle = retEither.value
@@ -111,6 +149,6 @@ fun main() {
 
     // clear existing relationships and secondary labels
     Neo4jUtils.clearRelationshipsAndLabels()
-   PubMedGraphApp.processPubMedIdStream(pubmedIdStream)
+    PubMedGraphApp.processPubMedIdStream(pubmedIdStream)
 }
 
