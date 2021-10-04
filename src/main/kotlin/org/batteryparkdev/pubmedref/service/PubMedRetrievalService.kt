@@ -12,6 +12,7 @@ import org.xml.sax.InputSource
 import java.io.StringReader
 import java.net.URL
 import java.nio.charset.Charset
+import java.util.stream.Stream
 import javax.xml.parsers.DocumentBuilderFactory
 
 object PubMedRetrievalService {
@@ -48,6 +49,21 @@ object PubMedRetrievalService {
             val parser = PubmedParser()
             val articleSet = parser.parse(text, ai.wisecube.pubmed.PubmedArticleSet::class.java)
             Either.Right(articleSet.pubmedArticleOrPubmedBookArticle[0] as PubmedArticle)
+        } catch (e: Exception) {
+            Either.Left(e)
+        }
+    }
+
+    fun retrievePubMedArticleStream(pubmedIdBatch:String): Either<Exception, Stream<PubmedArticle>> {
+        Thread.sleep(ncbiDelay)  // Accommodate NCBI maximum request rate
+        val url = pubMedTemplate
+            .replace(pubMedToken, pubmedIdBatch)
+        return try {
+            val text = URL(url).readText(Charset.defaultCharset())
+            val parser = PubmedParser()
+            val articleSet = parser.parse(text, ai.wisecube.pubmed.PubmedArticleSet::class.java)
+            val articleStream = articleSet.pubmedArticleOrPubmedBookArticle.stream() as Stream<PubmedArticle>
+            Either.Right(articleStream)
         } catch (e: Exception) {
             Either.Left(e)
         }
