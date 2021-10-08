@@ -56,6 +56,7 @@ abstract class AbstractPropertiesService {
         if (properties.containsKey(propertyName)) {
             properties.getProperty(propertyName).toLongOrNull() ?: 0L
         } else {
+            logger.atWarning().log( "$propertyName is an invalid property name " )
             0L
         }
 
