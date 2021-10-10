@@ -5,13 +5,11 @@ import com.google.common.base.Stopwatch
 import com.google.common.flogger.FluentLogger
 import org.batteryparkdev.pubmedref.model.PubMedEntry
 import org.batteryparkdev.pubmedref.neo4j.Neo4jConnectionService
-import org.batteryparkdev.pubmedref.neo4j.Neo4jPubMedLoader
 import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
 import org.batteryparkdev.pubmedref.service.TsvRecordSequenceSupplier
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
-import kotlin.system.measureTimeMillis
 
 /*
 Represents a Kotlin application that will load data for PubMed articles listed
@@ -23,12 +21,8 @@ create PubMedArticle nodes and their relationships.
  */
 
 
-class PubMedBatchLoader {
-    val pubMedTemplate =
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
-    val citationTemplate =
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&linkname=pubmed_pubmed_citedin" +
-                "&id=PUBMEDID&&tool=my_tool&email=NCBIEMAIL&api_key=APIKEY"
+class PubMedBatchLoader(val loadCitations:Boolean = false) {
+
     val pubMedToken = "PUBMEDID"
     private val ncbiBatchSize = 100
     val startTag = "<PubmedArticleSet>"
@@ -38,7 +32,6 @@ class PubMedBatchLoader {
     private val logger: FluentLogger = FluentLogger.forEnclosingClass();
     private val pubmedIdCol = "Pubmed_PMID"
     // For COSMIC data, The PubMed Ids to be loaded are in a CosmicMutantExport-formatted file
-
 
     /*
     Function to read lines from a specified TSV file (with header)
@@ -56,7 +49,8 @@ class PubMedBatchLoader {
                     .filter { !Neo4jUtils.existingOriginPubMedIdPredicate(it) }
                     .forEach {
                         createPubMedArticleNode(it)
-                        logger.atFine().log("Created basic PubMedArticle node for $it")
+                        Neo4jUtils.addLabel(it,"CosmicArticle")
+                        logger.atFine().log("Created PubMedArticle node for $it labeled CosmicArticle")
                         when (originIdList.size < ncbiBatchSize) {
                             true -> originIdList.add(it)
                             false -> {
@@ -67,7 +61,8 @@ class PubMedBatchLoader {
                         }
                     }
             }
-        if (originIdList.isNotEmpty()) {  // process last set of pubmed ids
+        if (originIdList.isNotEmpty()) {  // process residual set of pubmed ids
+            logger.atFine().log("Loading residual origin articles, count = ${originIdList.size}")
             loadOriginNodesByBatch(originIdList.joinToString(separator = ","))
         }
     }
@@ -94,7 +89,7 @@ class PubMedBatchLoader {
                         loadSecondaryNodes("REFERENCE", it.referenceSet, it.pubmedId)
                         nodeCount += it.referenceSet.size
                     }
-                    if (it.citationSet.isNotEmpty()) {
+                    if (loadCitations && it.citationSet.isNotEmpty()) {
                         loadSecondaryNodes("CITATION", it.citationSet, it.pubmedId)
                         nodeCount += it.citationSet.size
                     }
@@ -126,6 +121,7 @@ class PubMedBatchLoader {
             }
         }
         if (secondaryIdList.isNotEmpty()) {  // process last set of pubmed ids
+            logger.atFine().log("Loading residual secondary articles, count = ${secondaryIdList.size}")
             loadPubMedEntryByIdBatch(secondaryIdList.joinToString(separator = ","))
         }
         logger.atInfo().log("Secondary node load required ${secStopwatch.elapsed(TimeUnit.SECONDS)} seconds")
@@ -145,7 +141,7 @@ class PubMedBatchLoader {
 
     private fun loadPubMedEntryByIdBatch(
         pubmedIdBatch: String,
-        label: String = "Origin",
+        label: String = "CosmicArticle",
         parentId: String = ""
     ): List<PubMedEntry> {
         val entryList = mutableListOf<PubMedEntry>()
@@ -183,13 +179,13 @@ class PubMedBatchLoader {
         return Neo4jConnectionService.executeCypherCommand(command)
     }
 
-
     private val mergePubMedArticleTemplate = "MERGE (pma:PubMedArticle { pubmed_id: PMAID}) " +
             "SET  pma.pmc_id = \"PMCID\", pma.doi_id = \"DOIID\", " +
             " pma.journal_name = \"JOURNAL_NAME\", pma.journal_issue = \"JOURNAL_ISSUE\", " +
             " pma.article_title = \"TITLE\", pma.abstract = \"ABSTRACT\", " +
             " pma.author = \"AUTHOR\", pma.reference_count = REFCOUNT, " +
-            " pma.cited_by_count = CITED_BY " +
+            " pma.cited_by_count = CITED_BY, " +
+            " pma.keywords = \"KEYWORDS\" " +
             "  RETURN pma.pubmed_id"
 
     private fun mergePubMedEntry(pubMedEntry: PubMedEntry): String {
@@ -203,11 +199,12 @@ class PubMedBatchLoader {
             .replace("AUTHOR", pubMedEntry.authorCaption)
             .replace("REFCOUNT", pubMedEntry.referenceSet.size.toString())
             .replace("CITED_BY", pubMedEntry.citedByCount.toString())
+            .replace("KEYWORDS", pubMedEntry.keywords)
         return Neo4jConnectionService.executeCypherCommand(merge)
     }
 
 }
 
 fun main() {
-    PubMedBatchLoader().loadCosmicPubMedDataBatch("./data/sample_CosmicMutantExportCensus.tsv")
+    PubMedBatchLoader(false).loadCosmicPubMedDataBatch("./data/sample_CosmicMutantExportCensus.tsv")
 }

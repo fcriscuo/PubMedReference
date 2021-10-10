@@ -16,6 +16,7 @@ data class PubMedEntry(
     val authorCaption: String,
     val referenceSet: Set<String>,
     val citationSet: Set<String>,
+    val keywords: String,
     val citedByCount: Int
 ) {
     companion object: AbstractModel {
@@ -38,13 +39,24 @@ data class PubMedEntry(
             val abstract =  removeInternalQuotes(
                 resolveAbstract(pubmedArticle))
             val citations = PubMedRetrievalService.retrieveCitationIds(pmid)
-
             return PubMedEntry(
                 label, pmid, parentId,
                 pmcid, doiid, journalName, journalIssue, title,
                 abstract, authors, resolveReferenceIdSet(pubmedArticle),
-                citations, citations.size
+                citations, resolveKeywords(pubmedArticle),citations.size
             )
+        }
+
+        /*
+        Function to resolve unique keywords into a CSV
+        Supports query: keywords contains "XYZ"
+         */
+        private fun resolveKeywords(pubmedArticle: PubmedArticle): String {
+            val kwList = mutableListOf<String>()
+            pubmedArticle.medlineCitation.keywordList.forEach {
+                kwl -> kwl.keyword.stream().forEach {kw -> kwList.add(kw.getvalue()) }
+            }
+            return kwList.joinToString(",")
         }
 
         private fun resolveReferenceIdSet(pubmedArticle: PubmedArticle): Set<String> {

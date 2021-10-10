@@ -22,23 +22,22 @@ import javax.xml.parsers.DocumentBuilderFactory
 object PubMedRetrievalService {
 
      val logger: FluentLogger = FluentLogger.forEnclosingClass();
-
-    //    private val ncbiEmail = System.getenv("NCBI_EMAIL")
-//    private val ncbiApiKey = System.getenv("NCBI_API_KEY")
-    private const val ncbiEmail = "batteryparkdev@gmail.com"
-    private const val ncbiApiKey = "8ea2dc1ff16df40319a83d259764f641a208"
     private val dbFactory = DocumentBuilderFactory.newInstance()
     private val dBuilder = dbFactory.newDocumentBuilder()
-    private const val ncbiDelay:Long = 500L
+    private const val ncbiDelay:Long = 100L  // max NCBI request rate with key
     private val citationPath = resolveCitationLogFileName()
     private val citationFileWriter = File(citationPath).bufferedWriter()
      //   ApplicationPropertiesService.resolvePropertyAsLong("ncbi.request.delay.milliseconds")
 
-    private const val pubMedTemplate =
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
+    private  val pubMedTemplate =
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml" +
+                "&email=${java.lang.System.getenv("NCBI_EMAIL")}" +
+                "&api_key=${java.lang.System.getenv("NCBI_API_KEY")}"
     private val citationTemplate =
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&linkname=pubmed_pubmed_citedin" +
-                "&id=PUBMEDID&&tool=my_tool&email=NCBIEMAIL&api_key=APIKEY"
+                "&id=PUBMEDID&&tool=my_tool" +
+                "&email=${java.lang.System.getenv("NCBI_EMAIL")}" +
+                "&api_key=${java.lang.System.getenv("NCBI_API_KEY")}"
     private const val pubMedToken = "PUBMEDID"
 
 
@@ -78,8 +77,8 @@ object PubMedRetrievalService {
     fun retrieveCitationIds(pubmedId: String, repeat:Boolean = true): Set<String> {
         Thread.sleep(200L)
         val url = citationTemplate.replace(pubMedToken, pubmedId)
-            .replace("NCBIEMAIL", ncbiEmail)
-            .replace("APIKEY", ncbiApiKey)
+           // .replace("NCBIEMAIL", ncbiEmail)
+          //  .replace("APIKEY", ncbiApiKey)
         val citationSet = mutableSetOf<String>()
         try {
             val text = URL(url).readText(Charset.defaultCharset())
