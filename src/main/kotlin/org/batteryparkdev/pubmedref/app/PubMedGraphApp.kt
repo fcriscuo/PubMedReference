@@ -26,7 +26,7 @@ class PubMedGraphApp {
             val app = PubMedGraphApp()
             Neo4jUtils.clearRelationshipsAndLabels()
             ids.filter { it > 0 }
-                .forEach { it -> app.processPubMedNodeById(it) }
+                .forEach { app.processPubMedNodeById(it) }
         }
     }
 

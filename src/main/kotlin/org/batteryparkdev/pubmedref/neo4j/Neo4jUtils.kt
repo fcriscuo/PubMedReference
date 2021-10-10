@@ -122,7 +122,7 @@ object Neo4jUtils {
         if (!labelExistsPredicate(pubmedId, label)) {
             return Neo4jConnectionService.executeCypherCommand(addLabelCypher)
         }
-        logger.atWarning().log("PubMedArticle node $pubmedId  already has label $label")
+        //logger.atWarning().log("PubMedArticle node $pubmedId  already has label $label")
         return ""
     }
 

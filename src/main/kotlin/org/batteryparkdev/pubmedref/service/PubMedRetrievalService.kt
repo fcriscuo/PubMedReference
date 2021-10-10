@@ -4,11 +4,15 @@ import ai.wisecube.pubmed.PubmedArticle
 import ai.wisecube.pubmed.PubmedParser
 import arrow.core.Either
 import com.google.common.flogger.FluentLogger
+import org.batteryparkdev.pubmedref.neo4j.Neo4jConnectionService
+import org.batteryparkdev.pubmedref.neo4j.resolveCurrentTime
+import org.batteryparkdev.pubmedref.neo4j.resolveCypherLogFileName
 import org.batteryparkdev.pubmedref.property.ApplicationPropertiesService
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
+import java.io.File
 import java.io.StringReader
 import java.net.URL
 import java.nio.charset.Charset
@@ -18,21 +22,22 @@ import javax.xml.parsers.DocumentBuilderFactory
 object PubMedRetrievalService {
 
      val logger: FluentLogger = FluentLogger.forEnclosingClass();
-
-    //    private val ncbiEmail = System.getenv("NCBI_EMAIL")
-//    private val ncbiApiKey = System.getenv("NCBI_API_KEY")
-    private val ncbiEmail = "batteryparkdev@gmail.com"
-    private val ncbiApiKey = "8ea2dc1ff16df40319a83d259764f641a208"
     private val dbFactory = DocumentBuilderFactory.newInstance()
     private val dBuilder = dbFactory.newDocumentBuilder()
-    private val ncbiDelay:Long =
-        ApplicationPropertiesService.resolvePropertyAsLong("ncbi.request.delay.milliseconds")
+    private const val ncbiDelay:Long = 100L  // max NCBI request rate with key
+    private val citationPath = resolveCitationLogFileName()
+    private val citationFileWriter = File(citationPath).bufferedWriter()
+     //   ApplicationPropertiesService.resolvePropertyAsLong("ncbi.request.delay.milliseconds")
 
-    private const val pubMedTemplate =
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml"
+    private  val pubMedTemplate =
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&amp;id=PUBMEDID&amp;retmode=xml" +
+                "&email=${java.lang.System.getenv("NCBI_EMAIL")}" +
+                "&api_key=${java.lang.System.getenv("NCBI_API_KEY")}"
     private val citationTemplate =
         "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&linkname=pubmed_pubmed_citedin" +
-                "&id=PUBMEDID&&tool=my_tool&email=NCBIEMAIL&api_key=APIKEY"
+                "&id=PUBMEDID&&tool=my_tool" +
+                "&email=${java.lang.System.getenv("NCBI_EMAIL")}" +
+                "&api_key=${java.lang.System.getenv("NCBI_API_KEY")}"
     private const val pubMedToken = "PUBMEDID"
 
 
@@ -69,10 +74,11 @@ object PubMedRetrievalService {
         }
     }
 
-    fun retrieveCitationIds(pubmedId: String): Set<String> {
+    fun retrieveCitationIds(pubmedId: String, repeat:Boolean = true): Set<String> {
+        Thread.sleep(200L)
         val url = citationTemplate.replace(pubMedToken, pubmedId)
-            .replace("NCBIEMAIL", ncbiEmail)
-            .replace("APIKEY", ncbiApiKey)
+           // .replace("NCBIEMAIL", ncbiEmail)
+          //  .replace("APIKEY", ncbiApiKey)
         val citationSet = mutableSetOf<String>()
         try {
             val text = URL(url).readText(Charset.defaultCharset())
@@ -88,11 +94,22 @@ object PubMedRetrievalService {
                 }
             }
         } catch (e: Exception) {
-            logger.atWarning().log("++++  EXCEPTION getting citation set for $pubmedId")
+            logger.atWarning().log("++++  EXCEPTION getting citation set for $pubmedId, repeat = $repeat")
             logger.atWarning().log(e.message)
+            // sometimes NCBI is not responsive, try one more time
+            if (repeat) {
+                retrieveCitationIds(pubmedId, false)
+            } else {
+                citationFileWriter.write("$pubmedId\n")
+            }
         }
         return citationSet.toSet()
     }
+
+    fun resolveCitationLogFileName() =
+        ApplicationPropertiesService.resolvePropertyAsString("neo4j.log.dir") +"/" +
+                "missed_citations" +
+                "_" + resolveCurrentTime() + ".log"
 }
 
 fun main() {

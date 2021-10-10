@@ -42,15 +42,13 @@ is queried to determine if those Ids have existing PubMedReference nodes. If so,
 NCBI data request is skipped and an appropriate relationship to the Origin node is
 created and a secondary label is added.
 
-Origin nodes are reloaded regardless of whether they are already present in the database
-for two (2) reasons. First, it avoids keeping a permanent or transient list of a node's 
-relationships and secondary labels. Second, it ensures that any additional citations
-relating to an Origin node since it was last created are now represented.
-
 ### Support for COSMIC PubMed Ids
 
 The application has been modified to support mining PubMed data from NCBI using
 PubMed Ids listing in COSMIC tsv files. The Kotlin class 
 org.batteryparkdev.pubmedref.app.CosmicPubMedLoaderApp can be invokes with the full path
 name of the COSMIC file. The column name for PubMed Ids should be Pubmed_PMID. Given NCBI's
-request rate limit, processing a large COSMIC file will require several hours.
+request rate limit, processing a large COSMIC file will require several hours. 
+
+The CosmicPubMedLoaderApp has been extended to support sending batch requests for multiple PubMed
+articles. This significantly reduces the time need to load Origin PubMed articles.
