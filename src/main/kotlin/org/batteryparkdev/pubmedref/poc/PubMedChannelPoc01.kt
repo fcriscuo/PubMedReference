@@ -1,21 +1,24 @@
 package org.batteryparkdev.pubmedref.poc
 
+import ai.wisecube.pubmed.PubmedArticle
 import arrow.core.Either
+import com.google.common.base.Stopwatch
 import com.google.common.flogger.FluentLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord
+import org.batteryparkdev.pubmedref.model.PubMedEntry
+import org.batteryparkdev.pubmedref.neo4j.Neo4jConnectionService
+import org.batteryparkdev.pubmedref.neo4j.Neo4jUtils
 import org.batteryparkdev.pubmedref.service.PubMedRetrievalService
-import org.batteryparkdev.pubmedref.service.TsvRecordSequenceSupplier
 import java.io.FileReader
 import java.io.IOException
 import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.stream.Stream
-import kotlin.streams.asStream
+import java.util.concurrent.TimeUnit
 
 /*
 Represents a proof-of-concept for using Kotlin channels to perform
@@ -33,9 +36,8 @@ private const val bufferSize = 4
 private val NCBI_EMAIL = System.getenv("NCBI_EMAIL")
 private val NCBI_API_KEY = System.getenv("NCBI_API_KEY")
 private const val ncbiBatchSize = 30
-private const val pubmedIdCol:String = "Pubmed_PMID"
+private const val pubmedIdCol: String = "Pubmed_PMID"
 private const val ncbiDelay = 100L
-//private val idChannel = Channel<String>(2)
 
 /*
 Function to emit batches of PubMed Ids extracted from a TSV file
@@ -52,11 +54,27 @@ fun CoroutineScope.produceIdBatch(cosmicTsvFile: String) = produce<String> {
     getPubMedIdStream(path)
         .map { it.get(pubmedIdCol) }
         .filter { it.isNotEmpty() }
+        .filter { createNovelPubMedArticleNode (it,"CosmicReference") }
         .forEach {
-            delay(10)
             send(it)
+            delay(50)
         }
+}
+
+private fun createNovelPubMedArticleNode(pubmedId: String, label: String): Boolean  {
+    if (Neo4jUtils.pubMedNodeExistsPredicate(pubmedId)) {
+        return false
+    } else {
+        Neo4jConnectionService.executeCypherCommand(
+            " MERGE (pma: PubMedArticle{pubmed_id: $pubmedId}) " +
+                    " RETURN pma.pubmed_id"
+        )
+        if (label.isNotEmpty()) {
+            Neo4jUtils.addLabel(pubmedId, label)
         }
+    }
+    return true
+}
 
 fun getPubMedIdStream(aPath: Path): List<CSVRecord> {
     try {
@@ -75,59 +93,78 @@ fun getPubMedIdStream(aPath: Path): List<CSVRecord> {
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-fun CoroutineScope.processId(pubmedIds: ReceiveChannel<String>) = produce {
-
-    for (pubmedId in pubmedIds){
-        //println("PubMed Id: $pubmedId")
-            delay(30)
-            send(pubmedId)
-    }
-}
-
-/*
- when (val retEither =PubMedRetrievalService.retrievePubMedArticle("26050619")) {
-        is Either.Right -> {
-            val article = retEither.value
-            println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
-            PubMedRetrievalService.retrieveCitationIds("26050619").stream()
-                .forEach { cit -> println(cit) }
-        }
-        is Either.Left -> {
-            PubMedRetrievalService.logger.atInfo().log(" ${retEither.value.message}")
-        }
-    }
- */
-
-@OptIn(ExperimentalCoroutinesApi::class)
 fun CoroutineScope.retrievePubMedArticle(pubmedIds: ReceiveChannel<String>) = produce {
-    for (pubmedId in pubmedIds){
+    for (pubmedId in pubmedIds) {
         when (val retEither = PubMedRetrievalService.retrievePubMedArticle(pubmedId)) {
             is Either.Right -> {
-               send (retEither.value)
-                delay(10)
+                send(retEither.value)
+                delay(200)
             }
             is Either.Left -> {
                 PubMedRetrievalService.logger.atInfo().log(" ${retEither.value.message}")
             }
         }
     }
-
 }
 
-    fun main() = runBlocking<Unit> {
-        // val ids = produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv")
-        // val id2 = processId(ids)
-        var count = 1
-        //for (id in id2) {
-        for (article in retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))){
-            println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
-            count += 1
-        }
-        //delay(30_000)
-        println("Cancelling children")
-        coroutineContext.cancelChildren()
-        println("FINIS....")
+private val mergePubMedArticleTemplate = "MERGE (pma:PubMedArticle { pubmed_id: PMAID}) " +
+        "SET  pma.pmc_id = \"PMCID\", pma.doi_id = \"DOIID\", " +
+        " pma.journal_name = \"JOURNAL_NAME\", pma.journal_issue = \"JOURNAL_ISSUE\", " +
+        " pma.article_title = \"TITLE\", pma.abstract = \"ABSTRACT\", " +
+        " pma.author = \"AUTHOR\", pma.reference_count = REFCOUNT, " +
+        " pma.cited_by_count = CITED_BY, " +
+        " pma.keywords = \"KEYWORDS\" " +
+        "  RETURN pma.pubmed_id"
+
+private fun mergePubMedEntry(pubMedEntry: PubMedEntry): String {
+    val merge = mergePubMedArticleTemplate.replace("PMAID", pubMedEntry.pubmedId)
+        .replace("PMCID", pubMedEntry.pmcId)
+        .replace("DOIID", pubMedEntry.doiId)
+        .replace("JOURNAL_NAME", pubMedEntry.journalName)
+        .replace("JOURNAL_ISSUE", pubMedEntry.journalIssue)
+        .replace("TITLE", pubMedEntry.articleTitle)
+        .replace("ABSTRACT", pubMedEntry.abstract)
+        .replace("AUTHOR", pubMedEntry.authorCaption)
+        .replace("REFCOUNT", pubMedEntry.referenceSet.size.toString())
+        .replace("CITED_BY", pubMedEntry.citedByCount.toString())
+        .replace("KEYWORDS", pubMedEntry.keywords)
+    return Neo4jConnectionService.executeCypherCommand(merge)
+}
+
+/*
+Function to map the JAXB PubmedArticle objects to PubMedEntry objects and persist them
+ */
+fun CoroutineScope.persistPubMedArticle(pubmedArticles: ReceiveChannel<PubmedArticle>) = produce{
+    for (pubmedArticle in pubmedArticles) {
+        val entry = PubMedEntry.parsePubMedArticle(pubmedArticle)
+        val pubmedId = mergePubMedEntry(entry)
+        delay(50)
+        send(entry) // send out PubMed Entry for additional processing
     }
+}
+
+fun main() = runBlocking<Unit> {
+    var count = 0
+    val stopwatch = Stopwatch.createStarted()
+//    for (article in retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))) {
+//        println("PubMed ID: ${article.medlineCitation.pmid.getvalue()} ")
+//        println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
+//
+//    }
+  //  val articles = retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))
+    for (entry in persistPubMedArticle(retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))))
+    {
+        println("PubMedEntry  PubMed Id: ${entry.pubmedId}  ")
+        count += 1
+    }
+    stopwatch.elapsed(TimeUnit.SECONDS)
+    println("Article count = $count in ${stopwatch.elapsed(java.util.concurrent.TimeUnit.SECONDS)} seconds")
+    delay(20_000)
+    println("Cancelling children")
+    coroutineContext.cancelChildren()
+
+    println("FINIS....")
+}
 
 
 

@@ -53,8 +53,12 @@ object Neo4jUtils {
             val predicate = Neo4jConnectionService.executeCypherCommand(cypher)
             when (predicate.lowercase(Locale.getDefault())) {
                 "true" -> return true
-                "false" -> return false
+                "false" -> {
+                   logger.atFine().log("Pubmed id $pubmedId does NOT exist")
+                    return false
+                }
             }
+
         } catch (e: Exception) {
             logger.atSevere().log(e.message.toString())
             return false
@@ -67,8 +71,8 @@ object Neo4jUtils {
     This is to support reloading a node from NCBI to obtain the latest
     list of references and citations
      */
-    fun deleteExistingOriginNode(pubMedId:String) {
-        if(pubMedNodeExistsPredicate(pubMedId)) {
+    fun deleteExistingOriginNode(pubMedId: String) {
+        if (pubMedNodeExistsPredicate(pubMedId)) {
             val command = "MATCH (p:PubMedArticle{pubmed_id:$pubMedId}) DETACH DELETE p;"
             Neo4jConnectionService.executeCypherCommand(command)
             logger.atInfo().log("PubMedArticle id $pubMedId removed from Neo4j database")
@@ -85,7 +89,7 @@ object Neo4jUtils {
         logger.atInfo().log(" $nodeCount PubMedArticles deleted")
     }
 
-     fun createPubMedRelationship(label:String, parentPubMedId:String, pubmedId: String): String {
+    fun createPubMedRelationship(label: String, parentPubMedId: String, pubmedId: String): String {
         val command = when (label.uppercase()) {
             "REFERENCE" -> "MATCH (parent:PubMedArticle), (child:PubMedArticle) WHERE " +
                     "parent.pubmed_id = $parentPubMedId AND child.pubmed_id = $pubmedId " +
@@ -99,23 +103,23 @@ object Neo4jUtils {
         return Neo4jConnectionService.executeCypherCommand(command)
     }
 
-     fun labelExistsPredicate(pubmedId: String, label: String):Boolean {
+    fun labelExistsPredicate(pubmedId: String, label: String): Boolean {
         val labelExistsQuery = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
                 "RETURN apoc.label.exists(pma, \"$label\") AS output;"
-         return when (Neo4jConnectionService.executeCypherCommand(labelExistsQuery).uppercase()) {
-             "FALSE" -> false
-             else -> true
-         }
-     }
+        return when (Neo4jConnectionService.executeCypherCommand(labelExistsQuery).uppercase()) {
+            "FALSE" -> false
+            else -> true
+        }
+    }
 
     /*
    Function to avoid processing the same Origin node more than once
     */
-     fun existingOriginPubMedIdPredicate(pubmedId:String): Boolean =
+    fun existingOriginPubMedIdPredicate(pubmedId: String): Boolean =
         Neo4jUtils.pubMedNodeExistsPredicate(pubmedId) &&
                 Neo4jUtils.labelExistsPredicate(pubmedId, "Origin")
 
-     fun addLabel(pubmedId: String, label: String): String {
+    fun addLabel(pubmedId: String, label: String): String {
         // confirm that label is novel
         val addLabelCypher = "MATCH (pma:PubMedArticle{pubmed_id: $pubmedId }) " +
                 " CALL apoc.create.addLabels(pma, [\"$label\"] ) yield node return node"
@@ -125,7 +129,6 @@ object Neo4jUtils {
         //logger.atWarning().log("PubMedArticle node $pubmedId  already has label $label")
         return ""
     }
-
 }
 
 fun main() {
