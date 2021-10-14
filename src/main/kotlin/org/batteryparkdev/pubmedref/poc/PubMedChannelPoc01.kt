@@ -20,6 +20,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
+
 /*
 Represents a proof-of-concept for using Kotlin channels to perform
 time-consuming functions in an asynchronous manner.
@@ -54,14 +55,14 @@ fun CoroutineScope.produceIdBatch(cosmicTsvFile: String) = produce<String> {
     getPubMedIdStream(path)
         .map { it.get(pubmedIdCol) }
         .filter { it.isNotEmpty() }
-        .filter { createNovelPubMedArticleNode (it,"CosmicReference") }
+        .filter { createNovelPubMedArticleNode(it, "CosmicReference") }
         .forEach {
             send(it)
             delay(50)
         }
 }
 
-private fun createNovelPubMedArticleNode(pubmedId: String, label: String): Boolean  {
+private fun createNovelPubMedArticleNode(pubmedId: String, label: String): Boolean {
     if (Neo4jUtils.pubMedNodeExistsPredicate(pubmedId)) {
         return false
     } else {
@@ -134,7 +135,8 @@ private fun mergePubMedEntry(pubMedEntry: PubMedEntry): String {
 /*
 Function to map the JAXB PubmedArticle objects to PubMedEntry objects and persist them
  */
-fun CoroutineScope.persistPubMedArticle(pubmedArticles: ReceiveChannel<PubmedArticle>) = produce{
+@OptIn(ExperimentalCoroutinesApi::class)
+fun CoroutineScope.persistPubMedArticle(pubmedArticles: ReceiveChannel<PubmedArticle>) = produce {
     for (pubmedArticle in pubmedArticles) {
         val entry = PubMedEntry.parsePubMedArticle(pubmedArticle)
         val pubmedId = mergePubMedEntry(entry)
@@ -143,26 +145,50 @@ fun CoroutineScope.persistPubMedArticle(pubmedArticles: ReceiveChannel<PubmedArt
     }
 }
 
-fun main() = runBlocking<Unit> {
-    var count = 0
+/*
+Function that will process the PubMed articles used as a references in the
+original article. Creates a skeleton PubMedArticle node, creates a HAS_REFERENCE relationship
+with the original node, and adds a REFERENCE label.
+It is possible that the reference node already exists as a CosmicArticle node
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+fun CoroutineScope.createReferenceNodes(pubMedEntries: ReceiveChannel<PubMedEntry>) = produce {
+    for (pubmedEntry in pubMedEntries) {
+        val refList = mutableListOf<String>()
+        val parentId = pubmedEntry.pubmedId
+        pubmedEntry.referenceSet.stream().forEach { ref ->
+            Neo4jUtils.createPubMedArticleNode(ref)
+            Neo4jUtils.addLabel(ref, "Reference")
+            Neo4jUtils.createPubMedRelationship("REFERENCE", parentId, ref)
+            if (Neo4jUtils.isIncompleteNode(ref)) {
+                refList.add(ref)
+            }
+        }
+        //TODO: determine why this has to be a separate stream
+        refList.forEach { ref -> send(ref) }
+        delay(100)
+        refList.clear()
+    }
+}
+
+fun main(args: Array<String>) = runBlocking {
+    val inputFile = when (args.isNotEmpty()){
+        true -> args[0]
+        false -> "./data/sample_CosmicMutantExportCensus.tsv"
+    }
+    logger.atInfo().log("Processing PubMed Ids if $inputFile")
     val stopwatch = Stopwatch.createStarted()
-//    for (article in retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))) {
-//        println("PubMed ID: ${article.medlineCitation.pmid.getvalue()} ")
-//        println("Title: ${article.medlineCitation.article.articleTitle.getvalue()}")
-//
-//    }
-  //  val articles = retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))
-    for (entry in persistPubMedArticle(retrievePubMedArticle(produceIdBatch("./data/sample_CosmicMutantExportCensus.tsv"))))
-    {
-        println("PubMedEntry  PubMed Id: ${entry.pubmedId}  ")
-        count += 1
+    val entryChannel =
+        persistPubMedArticle(retrievePubMedArticle(produceIdBatch(inputFile)))
+    val refChannel = persistPubMedArticle(retrievePubMedArticle(createReferenceNodes(entryChannel)))
+    for (ref in refChannel) {  // consume this channel's entries
+        println("Reference Id ${ref.pubmedId}  Title: ${ref.articleTitle}")
     }
     stopwatch.elapsed(TimeUnit.SECONDS)
-    println("Article count = $count in ${stopwatch.elapsed(java.util.concurrent.TimeUnit.SECONDS)} seconds")
+    println("Elapsed time: ${stopwatch.elapsed(java.util.concurrent.TimeUnit.SECONDS)} seconds")
     delay(20_000)
     println("Cancelling children")
     coroutineContext.cancelChildren()
-
     println("FINIS....")
 }
 

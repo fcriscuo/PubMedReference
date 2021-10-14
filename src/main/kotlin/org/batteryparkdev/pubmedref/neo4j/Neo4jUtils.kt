@@ -79,6 +79,12 @@ object Neo4jUtils {
         }
     }
 
+     fun createPubMedArticleNode(pubmedId: String): String =
+        Neo4jConnectionService.executeCypherCommand(
+            " MERGE (pma: PubMedArticle{pubmed_id: $pubmedId}) " +
+                    " RETURN pma.pubmed_id"
+        )
+
     fun deleteExistingPubMedArticleNodes() {
         val nodeCount = Neo4jConnectionService.executeCypherCommand(
             "MATCH (pma:PubMedArticle) RETURN COUNT(pma)"
@@ -111,6 +117,19 @@ object Neo4jUtils {
             else -> true
         }
     }
+
+    /*
+  determine if a PubMedArticle has been fully loaded by
+  looking for a required property
+   */
+    fun isIncompleteNode(id: String): Boolean =
+        when (Neo4jConnectionService.executeCypherCommand(
+            "MATCH (pma:PubMedArticle {pubmed_id:$id}) RETURN COUNT(pma.article_title)"
+        )) {
+            "0" -> true
+            else -> false
+        }
+
 
     /*
    Function to avoid processing the same Origin node more than once

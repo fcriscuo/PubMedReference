@@ -67,7 +67,7 @@ class PubMedBatchLoader(val loadCitations:Boolean = false) {
         }
     }
 
-    private fun createPubMedArticleNode(pubmedId: String): String =
+     private fun createPubMedArticleNode(pubmedId: String): String =
         Neo4jConnectionService.executeCypherCommand(
             " MERGE (pma: PubMedArticle{pubmed_id: $pubmedId}) " +
                     " RETURN pma.pubmed_id"
