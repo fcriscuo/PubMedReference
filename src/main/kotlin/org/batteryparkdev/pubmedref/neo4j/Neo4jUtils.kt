@@ -150,6 +150,25 @@ object Neo4jUtils {
     }
 }
 
+/*
+Create a PubMedArticle Node if it does not already exist in the database
+Will add a specified label to the node, novel or existing
+ */
+fun createNovelPubMedArticleNode(pubmedId: String, label: String): Boolean {
+    if (Neo4jUtils.pubMedNodeExistsPredicate(pubmedId)) {
+        return false
+    } else {
+        Neo4jConnectionService.executeCypherCommand(
+            " MERGE (pma: PubMedArticle{pubmed_id: $pubmedId}) " +
+                    " RETURN pma.pubmed_id"
+        )
+        if (label.isNotEmpty()) {
+            Neo4jUtils.addLabel(pubmedId, label)
+        }
+    }
+    return true
+}
+
 fun main() {
     Neo4jUtils.clearRelationshipsAndLabels()
 }
