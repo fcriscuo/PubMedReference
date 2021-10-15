@@ -1,4 +1,4 @@
-package org.batteryparkdev.pubmedref.poc
+package org.batteryparkdev.pubmedref.app
 
 import ai.wisecube.pubmed.PubmedArticle
 import arrow.core.Either
@@ -170,7 +170,7 @@ fun main(args: Array<String>) = runBlocking {
         true -> args[0]
         false -> "./data/sample_CosmicMutantExportCensus.tsv"
     }
-    logger.atInfo().log("Processing PubMed Ids if $inputFile")
+    logger.atInfo().log("Processing PubMed Ids in $inputFile")
     val stopwatch = Stopwatch.createStarted()
     val entryChannel =
         persistPubMedArticle(retrievePubMedArticle(produceIdBatch(inputFile)))

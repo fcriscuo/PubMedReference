@@ -10,11 +10,7 @@ articles also contain a list of PubMed articles that were used as references. XM
 for each of these reference articles is fetched from NCBI and mapped to Neo4j nodes with 
 PubMedArticle and Reference labels. A Neo4j HAS_REFERENCE relationship is 
 created between the appropriate Origin and  each Reference nodes.
-In addition, a query is sent to NCBI requesting the PubMed Ids for articles that cite
-the origin node. The returned list is then used to fetch data for all the citation articles. 
-For
-each of these citations, a Neo4j node is created with PubMedArticle and Citation labels.
-A Neo4j CITED_BY relationship is created between the Origin node and each Citation node.
+
 
 This application utilizes the pubmed-parser library available from the thecloudcircle
 account on GitHub (https://github.com/thecloudcircle/pubmed-parser) to map XML data
@@ -36,11 +32,11 @@ across application invocations. All node relationships are deleted as are all
 secondary labels at the start of the application's execution. Any existing
 PubMedReference node whose id is specified in a subsequent invocation of the
 application is replaced with data fetched from NCBI
-But before data requests for reference and citation PubMed Ids are submitted to NCBI, 
+But before data requests for reference PubMed Ids are submitted to NCBI, 
 the database
 is queried to determine if those Ids have existing PubMedReference nodes. If so, the
 NCBI data request is skipped and an appropriate relationship to the Origin node is
-created and a secondary label is added.
+created and a secondary label (i.e. Reference) is added.
 
 ### Support for COSMIC PubMed Ids
 
@@ -49,4 +45,6 @@ PubMed Ids listing in COSMIC tsv files. The Kotlin class
 org.batteryparkdev.pubmedref.app.CosmicPubMedLoaderApp can be invokes with the full path
 name of the COSMIC file. The column name for PubMed Ids should be Pubmed_PMID. Given NCBI's
 request rate limit, processing a large COSMIC file will require several hours. 
-This application takes advantage of Kotlin's Channel technology
+This application takes advantage of Kotlin's Channel technology.
+This application also labels the nodes for PubMed articles listed in the COSMIC input file
+as CosmicReference nodes instead of Origin nodes.

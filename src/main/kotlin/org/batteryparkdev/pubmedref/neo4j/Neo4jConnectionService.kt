@@ -52,10 +52,10 @@ object Neo4jConnectionService {
     }
 
     fun executeCypherCommand(command: String): String {
-        if (command.uppercase().startsWith("MERGE ") ||
-                command.uppercase().startsWith("CREATE ")) {
-            cypherFileWriter.write("$command\n")
-        }
+//        if (command.uppercase().startsWith("MERGE ") ||
+//                command.uppercase().startsWith("CREATE ")) {
+//            cypherFileWriter.write("$command\n")
+//        }
         val session = driver.session()
         lateinit var resultString: String
         session.use {
